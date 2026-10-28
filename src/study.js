@@ -135,6 +135,22 @@ export function makeTopicPrompt(topic, entries, kind, sources, onlyId = '') {
   return `${kind === 'review' ? 'REVIEW' : 'RESEARCH'}: ${topic.id} ${topic.title}\nSubject: ${topic.subject}\nUnit: ${topic.unitTitle}\n\n${task}\n\nEXACT CHECKLIST SCOPE\n${scope}\n\nOFFICIAL REFERENCE LINKS\n${refs}${notes ? `\n\nMY STUDY NOTES\n${notes}` : ''}`;
 }
 
+export function makeTopicStudyPrompt(topic) {
+  const subtopics = topic.items.map((item, idx) => `${idx + 1}. [${item.id}] ${item.text}`).join('\n');
+  return `Please teach and explain all the sub-topics under "${topic.id}: ${topic.title}" (${topic.subject}) for my study and research:
+
+${subtopics}
+
+For each sub-topic, provide:
+1. Core conceptual explanation in clear, simple language
+2. Essential facts, definitions, dates, or key theories to remember
+3. Important points for exams and common questions to test understanding`;
+}
+
+export function makeSubtopicsList(topic) {
+  return topic.items.map(item => `${item.id}: ${item.text}`).join('\n');
+}
+
 export function makeBackup(entries, index, now = new Date().toISOString()) {
   const clean = Object.fromEntries(Object.entries(entries).filter(([id]) => index.itemMap[id]).map(([id, raw]) => [id, normalizeEntry(raw)]));
   return { app: 'study-atlas', version: 1, syllabusVersion: index.version, exportedAt: now, entries: clean };

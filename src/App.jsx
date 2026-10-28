@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import syllabus from './data/syllabus.json';
 import {
   buildIndex, filterTopics, progressStats, normalizeEntry, applyPatch, indiaDay, addDays,
-  assessmentScope, makeAssessmentPrompt, makeTopicPrompt, dailyProgress, weeklyProgress, subjectProgress
+  assessmentScope, makeAssessmentPrompt, makeTopicPrompt, dailyProgress, weeklyProgress, subjectProgress,
+  makeTopicStudyPrompt, makeSubtopicsList
 } from './study.js';
 import { Icon, ProgressBar, EmptyState, Modal, ExternalLink } from './components.jsx';
 
@@ -93,8 +94,8 @@ export default function App() {
   function openPrompt(topic, kind, itemId = '') {
     setPrompt({ title: `${kind === 'review' ? 'Check understanding' : 'Research'} · ${itemId || topic.id}`, text: makeTopicPrompt(topic, entries, kind, syllabus.sources, itemId) });
   }
-  async function copy(text) {
-    try { await navigator.clipboard.writeText(text); setToast('Assessment prompt copied! Paste it into your AI.'); }
+  async function copy(text, msg = 'Prompt copied! Paste it into your AI.') {
+    try { await navigator.clipboard.writeText(text); setToast(msg); }
     catch { setToast('Could not copy automatically. You can download or select the prompt text.'); }
   }
 
@@ -148,15 +149,15 @@ export default function App() {
             </div>
           </div>
           <div className="results-meta"><span><strong>{topics.length}</strong> main topics{query && <> matching “{query}”</>}</span><button className="text-button" onClick={() => { setQuery(''); setPart(''); setSubject(''); setStatus('all'); }}>Clear filters</button></div>
-          {topics.length ? <div className="topic-grid">{topics.slice(0,visibleCount).map(t => <TopicCard key={t.id} topic={t} entries={entries} navigate={navigate} />)}</div> : <EmptyState icon="search" title="No topics match these filters">Try a different concept, ID or learning status.</EmptyState>}
+          {topics.length ? <div className="topic-grid">{topics.slice(0,visibleCount).map(t => <TopicCard key={t.id} topic={t} entries={entries} navigate={navigate} onCopyPrompt={topic => copy(makeTopicStudyPrompt(topic), `AI study prompt for ${topic.id} copied!`)} />)}</div> : <EmptyState icon="search" title="No topics match these filters">Try a different concept, ID or learning status.</EmptyState>}
           {topics.length > visibleCount && <div className="load-more"><button className="button button-quiet" onClick={() => setVisibleCount(n => n + 24)}>Show more topics <span>{Math.min(24,topics.length-visibleCount)} more</span></button></div>}
         </>}
         {page === 'topic' && (currentTopic ? <>
           <button className="text-button back-link" onClick={() => navigate('syllabus')}><Icon name="back" size={17} />Back to syllabus</button>
           <div className="topic-heading"><div><span className="eyebrow">PART {currentTopic.part} / {currentTopic.subject}</span><div className="topic-id-title"><span className="code-tag">{currentTopic.id}</span><h1>{currentTopic.title}</h1></div><p>{currentTopic.unitTitle.replace(/ - NET Unit [IVX]+$/,'')}</p></div><span className="topic-count">{progressStats(currentTopic.items, entries).complete}<small>/ {currentTopic.items.length} complete</small></span></div>
           <ProgressBar value={progressStats(currentTopic.items, entries).percent} label={`${currentTopic.id} completion`} />
-          <div className="topic-actions"><button className="button" onClick={() => openPrompt(currentTopic,'research')}><Icon name="spark" size={17} />Research this topic</button><button className="button button-quiet" onClick={() => openPrompt(currentTopic,'review')}><Icon name="check" size={17} />Check my understanding</button></div>
-          <div className="learning-guide"><strong>How to use this checklist</strong><span>Check each subtopic when you have studied and understood it. Completed items automatically become available for your weekend assessment and revision prompts.</span></div>
+          <AIStudyPromptSection topic={currentTopic} onCopy={copy} />
+          <div className="learning-guide"><strong>When to check a subtopic</strong><span>Check each subtopic after reading and studying it. Completed items automatically become available for your weekend assessment and revision dashboard.</span></div>
           <section className="checklist-panel" aria-label="Topic subtopics"><div className="panel-label"><span>{currentTopic.items.length} SUBTOPICS</span><span>STATUS & ACTIONS</span></div>
             {currentTopic.items.map(item => <SubtopicRow key={item.id} item={item} state={normalizeEntry(entries[item.id])} onChange={patch => update(item.id, patch)} />)}
           </section>
@@ -241,10 +242,27 @@ function Overview({ entries, stats, navigate, browse }) {
   </>;
 }
 
-function TopicCard({ topic, entries, navigate }) {
+function TopicCard({ topic, entries, navigate, onCopyPrompt }) {
   const s = progressStats(topic.items, entries);
-  return <button className="topic-card" onClick={() => navigate(`topic/${topic.id}`)}>
-    <div className="topic-card-top"><span className="code-tag">{topic.id}</span><span className="topic-subject">{topic.subject}</span><Icon name="arrow" size={17} /></div>
+  return <div className="topic-card" onClick={() => navigate(`topic/${topic.id}`)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`topic/${topic.id}`); } }}>
+    <div className="topic-card-top">
+      <span className="code-tag">{topic.id}</span>
+      <span className="topic-subject">{topic.subject}</span>
+      {onCopyPrompt && (
+        <button
+          type="button"
+          className="card-quick-copy"
+          title={`Copy AI study prompt with all ${topic.items.length} sub-topics`}
+          onClick={e => {
+            e.stopPropagation();
+            onCopyPrompt(topic);
+          }}
+        >
+          <Icon name="spark" size={13} /> Copy AI Prompt
+        </button>
+      )}
+      <Icon name="arrow" size={17} />
+    </div>
     <h2>{topic.title}</h2>
     <p>{topic.unitTitle.replace(/ - NET Unit [IVX]+$/,'')}</p>
     <div className="topic-preview">
@@ -252,7 +270,60 @@ function TopicCard({ topic, entries, navigate }) {
     </div>
     <div className="topic-card-bottom"><span>{s.complete}/{s.total} complete</span><span>{s.revision > 0 ? `${s.revision} to revisit` : s.complete === s.total ? 'Complete' : `${s.total - s.complete} remaining`}</span></div>
     <ProgressBar value={s.percent} label={`${topic.id} progress`} />
-  </button>;
+  </div>;
+}
+
+function AIStudyPromptSection({ topic, onCopy }) {
+  const [expanded, setExpanded] = useState(false);
+  const promptText = useMemo(() => makeTopicStudyPrompt(topic), [topic]);
+  const listOnlyText = useMemo(() => makeSubtopicsList(topic), [topic]);
+
+  return (
+    <section className="ai-study-card" aria-label="AI Study Prompt">
+      <div className="ai-study-top">
+        <div className="ai-study-title">
+          <Icon name="spark" size={22} style={{ color: 'var(--accent)', marginTop: '2px' }} />
+          <div>
+            <h3>AI Study Prompt · All {topic.items.length} Sub-topics</h3>
+            <p className="muted" style={{ fontSize: '13px', marginTop: '3px' }}>
+              Copy this prompt to have your AI teach, explain, and research every sub-topic for this topic.
+            </p>
+          </div>
+        </div>
+        <div className="ai-study-actions">
+          <button
+            type="button"
+            className="button button-small"
+            onClick={() => onCopy(promptText, `AI study prompt for ${topic.id} copied!`)}
+          >
+            <Icon name="spark" size={15} /> Copy AI Study Prompt
+          </button>
+          <button
+            type="button"
+            className="button button-small button-quiet"
+            onClick={() => onCopy(listOnlyText, `Sub-topics list for ${topic.id} copied!`)}
+          >
+            <Icon name="list" size={15} /> Copy List Only
+          </button>
+        </div>
+      </div>
+      <pre
+        className="ai-prompt-pre"
+        style={{ maxHeight: expanded ? 'none' : '150px' }}
+      >
+        {promptText}
+      </pre>
+      {topic.items.length > 2 && (
+        <button
+          type="button"
+          className="ai-prompt-toggle"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? '▲ Collapse prompt preview' : `▼ Show all ${topic.items.length} sub-topics in prompt preview`}
+        </button>
+      )}
+    </section>
+  );
 }
 
 function SubtopicRow({ item, state, onChange }) {
