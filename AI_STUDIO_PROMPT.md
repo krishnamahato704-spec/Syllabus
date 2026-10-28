@@ -1,0 +1,15 @@
+# Paste this into Google AI Studio after importing the project
+
+Run and publish this existing React/Vite study tracker, Study Atlas. Preserve the actual app, its design and every syllabus entry. This is a working project; inspect its files before changing anything.
+
+The required dataset is `src/data/syllabus.json`: 204 main topics and 1,602 subtopics with stable IDs. Do not replace it with sample data, shorten it, split History into duplicate CTET/NET lists or invent completed progress. History is one combined course; CTET pedagogy remains separate. Keep the official source URLs and exam structure notes.
+
+The user wants Google sign-in and progress synced across devices. The project already uses Firebase Authentication with Google and Cloud Firestore. Connect it using the user's Firebase **public web configuration** in `src/firebase-config.js`. If that configuration has not been provided, keep the honest preview-mode notice and explain exactly what the user must configure. Never claim sync works while `firebaseConfig` is null. Do not request or embed service-account keys. The supplied `firestore.rules` must be published to the same Firebase project; only the authenticated owner may access their own progress. Keep the account-switch session guard, transaction updates, read-only offline state and save/error feedback.
+
+Keep search, part/subject/status filters, checkboxes, studying status, per-subtopic notes, revision flags, real progress counts, backup export/import, Markdown export, topic research/review prompts and the date-based weekend assessment prompt builder. AI prompts are copied by the user to their chosen AI service. No model API key or paid AI integration is required. Do not mark items complete merely because an AI prompt was created.
+
+Use the supplied package-lock.json and Node 24, or Node >=22.12.0. Install with `npm ci`. Run `npm test`, then `npm run build`. Development uses `npm run dev` on 0.0.0.0 port 3000. The production server is `npm start`; it serves `dist` on 0.0.0.0 and the environment's PORT. The included Dockerfile provides a build and serving configuration if needed. The app uses hash routes and needs no server database of its own.
+
+Before publishing, verify all four study parts, search for H004.04 and HI002.01, complete an item, save a Hindi note, flag it for revision, refresh, build a weekend prompt that includes only completed IDs, and export/import a backup. Check narrow phone layouts and keyboard/dialog operation. Keep the local fonts and their licence notices. Preserve `START_HERE.md` for the user.
+
+Tell the user to enable Google authentication, create Firestore, publish `firestore.rules` and add the exact preview/published hostnames to Firebase's Authorised domains. After publication, the user should sign in to the same account on a phone and computer and verify a completion change and note sync in both directions. Do not claim this live test happened unless it actually did. Review any paid hosting or Firebase billing choice with the user before enabling it.

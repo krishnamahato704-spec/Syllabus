@@ -38,4 +38,3 @@ Real Google sign-in and Firestore rules need project-backed testing after config
 The topic wording and stable IDs are preserved from the revised Social Science Master Checklist v2. The full source registry and exam-boundary notes are in `src/data/syllabus.json` and visible in Sources & settings. NCERT/CTET/NET reference URLs are study references, not a claim that this expanded checklist is an official syllabus. The syllabus version is `2026-10-28-v2`; review the official sources when an exam cycle changes.
 
 See [ASSET_CREDITS.md](ASSET_CREDITS.md) and `licenses` for font and style notices. Source components and icons were authored for this project. There is no tracking or advertising code.
-

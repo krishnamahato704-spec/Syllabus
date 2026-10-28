@@ -1,0 +1,13 @@
+Library-created material: reuse permission
+
+The new themes, token definitions, guides, SVG drawings and templates in this
+collection are authored for the user as this collection is created and extended. They contain no intentionally
+copied third-party designs or media. The user may use, copy, adapt and redistribute
+these materials in personal or commercial creative work without an additional
+library fee or attribution requirement.
+
+This permission applies only to items recorded as library-created. It does not
+change the licences of the Adobe fonts or the Salamander-based piano cue, and
+does not grant rights to project-specific files referenced by a project profile.
+No exclusive rights or public-domain status are claimed for generated material.
+Materials are provided as-is, without a warranty of fitness or noninfringement.

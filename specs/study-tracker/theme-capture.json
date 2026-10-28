@@ -1,0 +1,39 @@
+{
+  "name": "Slate study workspace",
+  "scope": "general",
+  "origin": "adapted-library-entry",
+  "source_entry": "slate-interface",
+  "mode": "light",
+  "tokens": {
+    "background": "#F4F6FA",
+    "surface": "#FFFFFF",
+    "text": "#1C293D",
+    "muted": "#536075",
+    "accent": "#2154A3",
+    "accentHover": "#163F80",
+    "onAccent": "#FFFFFF",
+    "border": "#7B879A",
+    "focus": "#2154A3",
+    "soft": "#E4EAF4"
+  },
+  "typography": {
+    "heading_family": "Source Serif 4",
+    "body_family": "Source Sans 3"
+  },
+  "style_rules": {
+    "typography": "Use Source Serif 4 semibold for primary page headings; Source Sans 3 for navigation, forms, secondary headings and body text.",
+    "language": "Use Noto Sans Devanagari as a Hindi fallback. Keep unmodified font binaries and OFL notices with distributed code.",
+    "navigation": "Desktop layout has a 242px white sidebar, a white top bar and a pale grey-blue canvas. At 760px the sidebar becomes an overlay with Escape, focus containment and a dimmed background.",
+    "panels": "Use 8\u201310px panel corners, fine grey separators, restrained 1px borders and 16\u201324px spacing between related panels.",
+    "checklist": "Use 15\u201316px checklist text, an ID above or beside each item, a native completion checkbox and separately labelled note and revision controls.",
+    "states": "Blue indicates actions and progress. Pair status colours with text labels. Respect reduced-motion preferences and retain visible keyboard focus.",
+    "headings": "Use serif headings at 30\u201339px, short muted introductions and honest count-based progress. Geometric map contours may decorate quiet reading cards."
+  },
+  "tags": [
+    "interface",
+    "study",
+    "checklist",
+    "reading",
+    "light"
+  ]
+}

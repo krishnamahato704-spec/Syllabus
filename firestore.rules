@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+    function validItemId(itemId) {
+      return itemId.matches('^(G|P|E|S|Y|L|H|D|EN|HI|LP|SP|N)[0-9]{3}\\.[0-9]{2}$');
+    }
+    function validRecord(data) {
+      return data.keys().hasOnly(['status', 'needsRevision', 'notes', 'completedAt', 'updatedAt'])
+        && data.keys().hasAll(['status', 'needsRevision', 'notes', 'completedAt', 'updatedAt'])
+        && data.status in ['not-started', 'studying', 'complete']
+        && data.needsRevision is bool
+        && data.notes is string && data.notes.size() <= 4000
+        && ((data.status == 'complete' && data.completedAt is string
+             && data.completedAt.size() <= 40
+             && data.completedAt.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T.*Z$'))
+            || (data.status != 'complete' && data.completedAt == null))
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+    match /users/{uid}/items/{itemId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid) && validItemId(itemId) && validRecord(request.resource.data);
+      allow delete: if owner(uid);
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}
