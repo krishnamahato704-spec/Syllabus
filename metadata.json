@@ -1,0 +1,7 @@
+{
+  "name": "Study Atlas · Social Science",
+  "description": "A Social Science study checklist with one combined History course, progress tracking and weekend assessment prompts.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

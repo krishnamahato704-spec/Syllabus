@@ -2,7 +2,13 @@ import { readFile, readdir, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'));
+let lock;
+try {
+  lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'));
+} catch {
+  console.log('package-lock.json not found, keeping existing third-party notices.');
+  process.exit(0);
+}
 const notices = ['Study Atlas — installed production dependency notices',
   'Includes a superset of packages used by the browser bundle. Font notices are separate files in licenses/.'];
 const sourceNotices = new Set();
