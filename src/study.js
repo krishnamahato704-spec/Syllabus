@@ -186,3 +186,183 @@ export function fullMarkdown(index, entries) {
   }
   return lines.join('\n');
 }
+
+export function dailyProgress(index, entries, daysBack = 14) {
+  const today = indiaDay();
+  const dayMap = new Map();
+  const days = [];
+  for (let i = daysBack - 1; i >= 0; i--) {
+    const d = addDays(today, -i);
+    const dateObj = new Date(`${d}T12:00:00+05:30`);
+    const weekday = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: TIME_ZONE }).format(dateObj);
+    const dayMonth = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: TIME_ZONE }).format(dateObj);
+    const slot = { day: d, weekday, label: dayMonth, count: 0, items: [] };
+    days.push(slot);
+    dayMap.set(d, slot);
+  }
+
+  const allCompletedDays = new Map();
+  for (const item of index.items) {
+    const record = entries[item.id];
+    if (record?.status === 'complete' && record?.completedAt) {
+      const d = indiaDay(record.completedAt);
+      if (!allCompletedDays.has(d)) allCompletedDays.set(d, []);
+      allCompletedDays.get(d).push(item);
+      if (dayMap.has(d)) {
+        const slot = dayMap.get(d);
+        slot.count++;
+        slot.items.push(item);
+      }
+    }
+  }
+
+  let streak = 0;
+  let checkDay = today;
+  if (!allCompletedDays.has(today)) {
+    checkDay = addDays(today, -1);
+  }
+  while (allCompletedDays.has(checkDay) && allCompletedDays.get(checkDay).length > 0) {
+    streak++;
+    checkDay = addDays(checkDay, -1);
+  }
+
+  const activeDaysCount = Array.from(allCompletedDays.keys()).length;
+  const totalCompleted = index.items.filter(i => entries[i.id]?.status === 'complete').length;
+  const maxDayCount = Math.max(1, ...days.map(d => d.count));
+
+  return {
+    days,
+    streak,
+    activeDaysCount,
+    totalCompleted,
+    maxDayCount,
+    todayCount: dayMap.get(today)?.count || 0,
+    allCompletedDays,
+  };
+}
+
+export function weeklyProgress(index, entries, weeksBack = 8) {
+  const today = indiaDay();
+  const weeks = [];
+  for (let w = weeksBack - 1; w >= 0; w--) {
+    const endDay = addDays(today, -w * 7);
+    const startDay = addDays(endDay, -6);
+    const startDateObj = new Date(`${startDay}T12:00:00+05:30`);
+    const endDateObj = new Date(`${endDay}T12:00:00+05:30`);
+    const startLabel = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: TIME_ZONE }).format(startDateObj);
+    const endLabel = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: TIME_ZONE }).format(endDateObj);
+    weeks.push({
+      index: w,
+      startDay,
+      endDay,
+      label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${startLabel} – ${endLabel}`,
+      count: 0,
+      items: [],
+    });
+  }
+
+  for (const item of index.items) {
+    const record = entries[item.id];
+    if (record?.status === 'complete' && record?.completedAt) {
+      const ms = Date.parse(record.completedAt);
+      for (const wk of weeks) {
+        const wkStartMs = new Date(`${wk.startDay}T00:00:00+05:30`).getTime();
+        const wkEndMs = new Date(`${wk.endDay}T23:59:59.999+05:30`).getTime();
+        if (ms >= wkStartMs && ms <= wkEndMs) {
+          wk.count++;
+          wk.items.push(item);
+          break;
+        }
+      }
+    }
+  }
+
+  const maxWeekCount = Math.max(1, ...weeks.map(w => w.count));
+  const activeWeeks = weeks.filter(w => w.count > 0).length;
+  const bestWeek = weeks.reduce((prev, cur) => cur.count > prev.count ? cur : prev, weeks[0]);
+
+  return {
+    weeks,
+    maxWeekCount,
+    activeWeeks,
+    bestWeek,
+    currentWeek: weeks[weeks.length - 1],
+  };
+}
+
+export function subjectProgress(index, entries) {
+  const parts = [
+    { part: 1, label: 'School subjects', description: 'Geography, Civics, Economics and allied subjects' },
+    { part: 2, label: 'History', description: 'One combined course, school to NET depth' },
+    { part: 3, label: 'CTET Paper II', description: 'CDP, English I, Hindi II and teaching methods' },
+    { part: 4, label: 'UGC NET Paper I', description: 'Teaching, research and general aptitude units' },
+  ];
+
+  const partStats = parts.map(p => {
+    const pItems = index.items.filter(i => i.part === p.part);
+    const pTopics = index.topics.filter(t => t.part === p.part);
+    const subjectsMap = new Map();
+
+    for (const t of pTopics) {
+      if (!subjectsMap.has(t.subject)) {
+        subjectsMap.set(t.subject, {
+          name: t.subject,
+          part: p.part,
+          topicsCount: 0,
+          completedTopicsCount: 0,
+          totalSubtopics: 0,
+          completedSubtopics: 0,
+          revisionCount: 0,
+        });
+      }
+      const sObj = subjectsMap.get(t.subject);
+      sObj.topicsCount++;
+      const tStats = progressStats(t.items, entries);
+      sObj.totalSubtopics += t.items.length;
+      sObj.completedSubtopics += tStats.complete;
+      sObj.revisionCount += tStats.revision;
+      if (tStats.complete === t.items.length) {
+        sObj.completedTopicsCount++;
+      }
+    }
+
+    const sStats = progressStats(pItems, entries);
+    const completedTopicsInPart = pTopics.filter(t => t.items.every(i => entries[i.id]?.status === 'complete')).length;
+
+    const subjects = Array.from(subjectsMap.values()).map(s => ({
+      ...s,
+      percent: s.totalSubtopics ? Math.round((s.completedSubtopics / s.totalSubtopics) * 100) : 0,
+    }));
+
+    return {
+      ...p,
+      total: pItems.length,
+      complete: sStats.complete,
+      percent: sStats.percent,
+      revision: sStats.revision,
+      topicsCount: pTopics.length,
+      completedTopicsCount: completedTopicsInPart,
+      subjects,
+    };
+  });
+
+  const totalTopics = index.topics.length;
+  let fullyCompletedTopics = 0;
+  let inProgressTopics = 0;
+  let notStartedTopics = 0;
+
+  for (const t of index.topics) {
+    const complete = t.items.filter(i => entries[i.id]?.status === 'complete').length;
+    if (complete === t.items.length) fullyCompletedTopics++;
+    else if (complete > 0) inProgressTopics++;
+    else notStartedTopics++;
+  }
+
+  return {
+    parts: partStats,
+    totalTopics,
+    fullyCompletedTopics,
+    inProgressTopics,
+    notStartedTopics,
+  };
+}
