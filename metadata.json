@@ -1,6 +1,6 @@
 {
-  "name": "Study Atlas · Social Science",
-  "description": "A Social Science study checklist with one combined History course, progress tracking and weekend assessment prompts.",
+  "name": "Testbook Assessment Hub",
+  "description": "Standardized CBT assessment and test series platform for NCERT Class 6-10 Social Science, CTET Paper 2, UGC NET History, and PG History.",
   "capabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
