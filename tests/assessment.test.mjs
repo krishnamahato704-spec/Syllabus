@@ -23,10 +23,10 @@ test('Test categories include all major exam streams and sectionals', () => {
   assert.ok(categoryIds.includes('ncert'));
   assert.ok(categoryIds.includes('ctet'));
   assert.ok(categoryIds.includes('ugc_net'));
-  assert.ok(categoryIds.includes('pg_history'));
+  assert.ok(!categoryIds.includes('pg_history'), 'pg_history must be excluded per user request');
 });
 
-test('Default test paper bank contains at least 10 tests for each of the 4 exam categories', () => {
+test('Default test paper bank contains at least 10 tests for each of the 3 exam categories', () => {
   const ncertTests = ALL_INITIAL_TESTS.filter(t => t.category === 'ncert');
   const ctetTests = ALL_INITIAL_TESTS.filter(t => t.category === 'ctet');
   const ugcNetTests = ALL_INITIAL_TESTS.filter(t => t.category === 'ugc_net');
@@ -35,8 +35,8 @@ test('Default test paper bank contains at least 10 tests for each of the 4 exam 
   assert.ok(ncertTests.length >= 10, `Expected at least 10 NCERT tests, found ${ncertTests.length}`);
   assert.ok(ctetTests.length >= 10, `Expected at least 10 CTET tests, found ${ctetTests.length}`);
   assert.ok(ugcNetTests.length >= 10, `Expected at least 10 UGC NET tests, found ${ugcNetTests.length}`);
-  assert.ok(pgTests.length >= 10, `Expected at least 10 PG History tests, found ${pgTests.length}`);
-  assert.ok(ALL_INITIAL_TESTS.length >= 40, `Expected at least 40 total tests, found ${ALL_INITIAL_TESTS.length}`);
+  assert.equal(pgTests.length, 0, 'No PG History tests should exist in bank');
+  assert.ok(ALL_INITIAL_TESTS.length >= 50, `Expected at least 50 total tests, found ${ALL_INITIAL_TESTS.length}`);
 });
 
 test('NCERT tests strictly follow 50 questions for 50 marks format', () => {
@@ -91,11 +91,53 @@ test('UGC NET History tests follow official Paper 1, Paper 2, and Combined mocks
   assert.equal(combined.totalMarks, 300);
 });
 
-test('Post-Graduation History tests are available with advanced questions', () => {
-  const pg1 = ALL_INITIAL_TESTS.find(t => t.id === 'pg-hist-01');
-  assert.ok(pg1, 'PG History test 1 must exist');
-  assert.equal(pg1.questions.length, 50);
-  assert.equal(pg1.difficulty, 'High');
+test('Post-Graduation History is completely excluded from test papers as requested', () => {
+  const pgTests = ALL_INITIAL_TESTS.filter(t => t.category === 'pg_history' || t.id.startsWith('pg-hist'));
+  assert.equal(pgTests.length, 0, 'Zero PG History tests should exist in the active test bank');
+});
+
+test('Zero Recurring Questions: Every test paper in the bank has 100% unique questions with NO intra-test duplicates', () => {
+  for (const testPaper of ALL_INITIAL_TESTS) {
+    assert.ok(testPaper.questions && testPaper.questions.length > 0, `Test ${testPaper.id} must have questions`);
+    assert.equal(
+      testPaper.questions.length,
+      testPaper.totalQuestions,
+      `Test ${testPaper.id} questions length (${testPaper.questions.length}) must match totalQuestions (${testPaper.totalQuestions})`
+    );
+
+    const questionTexts = testPaper.questions.map(q => q.question.trim());
+    const uniqueQuestions = new Set(questionTexts);
+
+    // If there is any duplicate, identify the duplicate question text for diagnosis
+    if (uniqueQuestions.size !== questionTexts.length) {
+      const seen = new Set();
+      const duplicates = [];
+      for (const q of questionTexts) {
+        if (seen.has(q)) duplicates.push(q);
+        seen.add(q);
+      }
+      assert.fail(`Test ${testPaper.id} has ${duplicates.length} duplicate questions! First duplicate: "${duplicates[0]}"`);
+    }
+
+    assert.equal(
+      uniqueQuestions.size,
+      testPaper.questions.length,
+      `Test ${testPaper.id} must have ZERO duplicate questions within the same test paper`
+    );
+  }
+});
+
+test('Expanded test paper bank contains ample tests across all syllabus sections', () => {
+  const ncertTests = ALL_INITIAL_TESTS.filter(t => t.category === 'ncert');
+  const ctetTests = ALL_INITIAL_TESTS.filter(t => t.category === 'ctet');
+  const ugcNetTests = ALL_INITIAL_TESTS.filter(t => t.category === 'ugc_net');
+  const pgTests = ALL_INITIAL_TESTS.filter(t => t.category === 'pg_history');
+
+  assert.ok(ncertTests.length >= 12, `NCERT should have at least 12 tests, got ${ncertTests.length}`);
+  assert.ok(ctetTests.length >= 15, `CTET should have at least 15 tests, got ${ctetTests.length}`);
+  assert.ok(ugcNetTests.length >= 18, `UGC NET should have at least 18 tests, got ${ugcNetTests.length}`);
+  assert.equal(pgTests.length, 0, 'PG History tests must be 0');
+  assert.ok(ALL_INITIAL_TESTS.length >= 50, `Total tests should be >= 50, got ${ALL_INITIAL_TESTS.length}`);
 });
 
 test('Attempt submission computes score, accuracy, and section breakdown correctly', () => {

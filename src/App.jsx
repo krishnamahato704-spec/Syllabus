@@ -328,7 +328,7 @@ export default function App() {
           <Search size={18} className="search-icon" />
           <input
             type="search"
-            placeholder="Search NCERT, CTET Paper 2, UGC NET History or PG tests..."
+            placeholder="Search NCERT, CTET Paper 2, or UGC NET History tests..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -368,12 +368,11 @@ export default function App() {
               Targeted examination preparation with official blueprint mocks and dedicated 
               <strong> short-burst sectional tests</strong> for 
               <strong> CTET Paper 2</strong> (CDP, English, Hindi, Social Science), 
-              <strong> UGC NET History</strong> (Paper 1 & Paper 2), 
-              <strong> NCERT Class 6–10</strong>, and 
-              <strong> Post-Graduation History</strong>.
+              <strong> UGC NET History</strong> (Paper 1 & Paper 2), and 
+              <strong> NCERT Class 6–10 Social Science</strong>.
             </p>
             <div className="hero-highlights-strip">
-              <span className="hero-tag">40+ Standardized Tests</span>
+              <span className="hero-tag">50+ Standardized Tests</span>
               <span className="hero-tag">⚡ 15–30 Min Quick Sectionals</span>
               <span className="hero-tag">Detailed Solutions & Diagnostics</span>
               <span className="hero-tag">Retest Integrity Lockout</span>
@@ -670,7 +669,7 @@ export default function App() {
         <div className="footer-content">
           <div className="footer-left">
             <strong>Testbook Assessment Hub</strong>
-            <span>Standardized Computer Based Tests for NCERT, CTET Paper 2, UGC NET & Master's History.</span>
+            <span>Standardized Computer Based Tests for NCERT, CTET Paper 2, and UGC NET History.</span>
           </div>
           <div className="footer-right">
             <button

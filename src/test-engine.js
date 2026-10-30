@@ -1,7 +1,7 @@
 // test-engine.js - Testbook Assessment Engine and Storage Manager
 import { ALL_INITIAL_TESTS } from './data/tests-data.js';
 
-const STORAGE_TESTS_KEY = 'testbook_assessment_tests_v2';
+const STORAGE_TESTS_KEY = 'testbook_assessment_tests_v4';
 const STORAGE_ATTEMPTS_KEY = 'testbook_assessment_attempts_v2';
 
 // Initialize tests in localStorage if not already present
@@ -18,7 +18,13 @@ export function getStoredTests() {
       const updated = parsed.map(t => {
         if (initialMap.has(t.id)) {
           const init = initialMap.get(t.id);
-          return { ...init, ...t, syllabusSection: init.syllabusSection, isSectional: init.isSectional, isQuickBurst: init.isQuickBurst };
+          return {
+            ...init,
+            isCompleted: t.isCompleted,
+            syllabusSection: init.syllabusSection,
+            isSectional: init.isSectional,
+            isQuickBurst: init.isQuickBurst
+          };
         }
         return t;
       });

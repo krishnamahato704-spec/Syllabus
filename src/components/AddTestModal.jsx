@@ -313,7 +313,6 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                   <option value="ncert">NCERT Class 6-10 Social Science</option>
                   <option value="ctet">CTET Paper 2 (Social Science)</option>
                   <option value="ugc_net">UGC NET History (Paper 1 & 2)</option>
-                  <option value="pg_history">Post-Graduation History</option>
                 </select>
               </label>
             </div>
