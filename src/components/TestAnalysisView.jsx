@@ -2,15 +2,18 @@ import React, { useState, useMemo } from 'react';
 import {
   Award, CheckCircle2, XCircle, MinusCircle, Clock,
   BarChart3, FileText, ChevronLeft, ChevronRight,
-  Filter, Check, X, ShieldAlert, ArrowLeft, Target, TrendingUp
+  Check, X, ShieldAlert, ArrowLeft, Target, AlertCircle
 } from 'lucide-react';
 
 export default function TestAnalysisView({ test, attempt, onBackToHub }) {
+  const paper = attempt.testSnapshot || test || { title: attempt.testTitle || 'Historical result', category: attempt.category, questions: [], markingScheme: {correct: 1, incorrect: 0}, sections: [] };
+  const questions = paper?.questions || [];
   const [filterType, setFilterType] = useState('all'); // 'all' | 'correct' | 'incorrect' | 'unattempted'
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
 
   // Format seconds to mm:ss or hh:mm:ss
   function formatTime(sec) {
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
     if (!sec) return '0m';
     const m = Math.floor(sec / 60);
     const s = sec % 60;
@@ -23,8 +26,8 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
 
   // Filter questions based on attempt answers
   const filteredQuestions = useMemo(() => {
-    return test.questions.map((q, idx) => {
-      const userChoice = attempt.userAnswers[q.id];
+    return questions.map((q, idx) => {
+      const userChoice = attempt.userAnswers?.[q.id];
       const isUnattempted = userChoice === undefined || userChoice === null;
       const isCorrect = !isUnattempted && userChoice === q.correctAnswer;
       const isIncorrect = !isUnattempted && userChoice !== q.correctAnswer;
@@ -42,9 +45,13 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
       if (filterType === 'unattempted') return q.isUnattempted;
       return true;
     });
-  }, [test.questions, attempt, filterType]);
+  }, [questions, attempt, filterType]);
 
-  const activeQuestion = filteredQuestions[selectedQuestionIndex] || filteredQuestions[0] || test.questions[0];
+  const activeQuestion = filteredQuestions[selectedQuestionIndex] || filteredQuestions[0];
+  const attemptedCount = (attempt.correctCount || 0) + (attempt.incorrectCount || 0);
+  const coverage = questions.length ? Math.round(attemptedCount / questions.length * 100) : 0;
+  const source = activeQuestion?.source;
+  const sourceUrl = typeof source?.url === 'string' && /^https?:\/\//i.test(source.url) ? source.url : null;
 
   return (
     <div className="testbook-analysis-container">
@@ -55,11 +62,11 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
           className="analysis-back-btn"
           onClick={onBackToHub}
         >
-          <ArrowLeft size={18} /> Back to Test Series Hub
+          <ArrowLeft size={18} /> Back to test hub
         </button>
         <div className="analysis-title-wrap">
-          <span className="exam-badge">{test.targetExam || test.category.toUpperCase()}</span>
-          <h1>Performance Analysis & Solutions · {test.title}</h1>
+          <span className="exam-badge">{paper.targetExam || paper.category?.toUpperCase()}</span>
+          <h1>Results & solutions · {paper.title}</h1>
         </div>
       </div>
 
@@ -67,13 +74,17 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
       <div className="retest-lock-notice" role="status">
         <ShieldAlert size={20} className="lock-icon" />
         <div className="lock-copy">
-          <strong>Test Completed & Locked (No Retest Policy)</strong>
+          <strong>Completed paper · read-only review</strong>
           <span>
             Submitted on {new Date(attempt.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.
-            As requested, completed tests are preserved for continuous performance monitoring and cannot be re-taken. Use the deep solutions below to revise mistakes.
+            {' '}This scored sitting is locked under your no-retest policy. Use the solutions below to review your answers.
           </span>
         </div>
       </div>
+      {attempt.legacyWarning && <div className="analysis-legacy-warning" role="note">
+        <AlertCircle size={20} />
+        <p>{typeof attempt.legacyWarning === 'string' ? attempt.legacyWarning : 'This older record has no saved paper version. The displayed questions and option order may differ from your original sitting.'}</p>
+      </div>}
 
       {/* Performance Scorecard KPI Grid */}
       <div className="analysis-scorecard-grid">
@@ -95,11 +106,11 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
         </div>
 
         <div className="scorecard-tile">
-          <div className="tile-top"><span>ESTIMATED PERCENTILE</span><TrendingUp size={20} /></div>
+          <div className="tile-top"><span>PAPER COVERAGE</span><FileText size={20} /></div>
           <div className="tile-main-val">
-            <span className="big-score text-blue">{attempt.percentile}%ile</span>
+            <span className="big-score text-blue">{coverage}%</span>
           </div>
-          <small className="tile-sub">Projected candidate standing</small>
+          <small className="tile-sub">{attemptedCount} of {questions.length} questions answered</small>
         </div>
 
         <div className="scorecard-tile">
@@ -107,7 +118,7 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
           <div className="tile-main-val">
             <span className="big-score">{formatTime(attempt.timeSpentSeconds)}</span>
           </div>
-          <small className="tile-sub">Allotted: {test.durationMinutes} mins</small>
+          <small className="tile-sub">Allotted: {paper.durationMinutes} mins</small>
         </div>
 
         <div className="scorecard-tile summary-breakdown">
@@ -127,17 +138,17 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
             <h2>Sectional Performance Breakdown</h2>
             <span className="muted">Subject-level accuracy & score distribution</span>
           </div>
-          <div className="analysis-table-wrap">
+          <div className="analysis-table-wrap" tabIndex={0} role="region" aria-label="Section performance table">
             <table className="analysis-table">
               <thead>
                 <tr>
-                  <th>Section</th>
-                  <th>Questions</th>
-                  <th>Attempted</th>
-                  <th>Correct</th>
-                  <th>Wrong</th>
-                  <th>Accuracy</th>
-                  <th>Score</th>
+                  <th scope="col">Section</th>
+                  <th scope="col">Questions</th>
+                  <th scope="col">Attempted</th>
+                  <th scope="col">Correct</th>
+                  <th scope="col">Wrong</th>
+                  <th scope="col">Accuracy</th>
+                  <th scope="col">Score</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,9 +156,9 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
                   const secAcc = sec.attempted > 0 ? Math.round((sec.correct / sec.attempted) * 100) : 0;
                   return (
                     <tr key={sId}>
-                      <td className="sec-name-cell">
+                      <th scope="row" className="sec-name-cell">
                         <strong>{sec.name}</strong>
-                      </td>
+                      </th>
                       <td>{sec.total}</td>
                       <td>{sec.attempted}</td>
                       <td className="text-green font-bold">{sec.correct}</td>
@@ -174,7 +185,7 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
       <section className="analysis-solutions-section">
         <div className="solutions-header">
           <div>
-            <span className="eyebrow">STEP-BY-STEP REVIEW</span>
+            <span className="eyebrow">ANSWER REVIEW</span>
             <h2>Solutions & Explanations</h2>
           </div>
 
@@ -183,13 +194,15 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
             <button
               type="button"
               className={`filter-chip ${filterType === 'all' ? 'active' : ''}`}
+              aria-pressed={filterType === 'all'}
               onClick={() => { setFilterType('all'); setSelectedQuestionIndex(0); }}
             >
-              All ({test.questions.length})
+              All ({questions.length})
             </button>
             <button
               type="button"
               className={`filter-chip correct ${filterType === 'correct' ? 'active' : ''}`}
+              aria-pressed={filterType === 'correct'}
               onClick={() => { setFilterType('correct'); setSelectedQuestionIndex(0); }}
             >
               Correct ({attempt.correctCount})
@@ -197,6 +210,7 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
             <button
               type="button"
               className={`filter-chip incorrect ${filterType === 'incorrect' ? 'active' : ''}`}
+              aria-pressed={filterType === 'incorrect'}
               onClick={() => { setFilterType('incorrect'); setSelectedQuestionIndex(0); }}
             >
               Incorrect ({attempt.incorrectCount})
@@ -204,6 +218,7 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
             <button
               type="button"
               className={`filter-chip unattempted ${filterType === 'unattempted' ? 'active' : ''}`}
+              aria-pressed={filterType === 'unattempted'}
               onClick={() => { setFilterType('unattempted'); setSelectedQuestionIndex(0); }}
             >
               Skipped ({attempt.unattemptedCount})
@@ -228,10 +243,10 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
 
                 <div className="sol-user-verdict">
                   {activeQuestion.isCorrect && (
-                    <span className="verdict-tag correct"><Check size={14} /> Correct (+{test.markingScheme?.correct || 1})</span>
+                    <span className="verdict-tag correct"><Check size={14} /> Correct (+{paper.markingScheme?.correct ?? 1})</span>
                   )}
                   {activeQuestion.isIncorrect && (
-                    <span className="verdict-tag incorrect"><X size={14} /> Incorrect (-{test.markingScheme?.incorrect || 0})</span>
+                    <span className="verdict-tag incorrect"><X size={14} /> Incorrect ({paper.markingScheme?.incorrect ? `−${Math.abs(paper.markingScheme.incorrect)}` : '0'})</span>
                   )}
                   {activeQuestion.isUnattempted && (
                     <span className="verdict-tag unattempted">Not Attempted (0)</span>
@@ -239,7 +254,10 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
                 </div>
               </div>
 
-              {/* Question Text */}
+              {activeQuestion.passage?.text && <div className="review-passage">
+                <h3>{activeQuestion.passage.title || 'Passage'}</h3>
+                <p>{activeQuestion.passage.text}</p>
+              </div>}
               <p className="sol-question-text">{activeQuestion.question}</p>
 
               {/* Options Breakdown */}
@@ -276,11 +294,16 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
               <div className="sol-explanation-box">
                 <div className="sol-exp-title">
                   <FileText size={18} />
-                  <strong>Comprehensive Explanation & Historical Context</strong>
+                  <strong>Explanation</strong>
                 </div>
                 <div className="sol-exp-body">
-                  <p>{activeQuestion.explanation || 'Detailed historical and syllabus solution verified per official examination answer keys.'}</p>
+                  <p>{activeQuestion.explanation || 'No explanation was saved for this question.'}</p>
+                  {activeQuestion.syllabusIds?.length>0&&<p className="solution-syllabus-ids">Syllabus topic IDs: {activeQuestion.syllabusIds.join(', ')} · {activeQuestion.topic}</p>}
                 </div>
+                {source && <div className="solution-source-reference">
+                  <span>Topic reference: </span>
+                  {sourceUrl ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer">{source.name || 'Source reference'}</a> : <span>{source.name || 'No source link saved'}</span>}
+                </div>}
               </div>
 
               {/* Navigation Footer */}
@@ -291,7 +314,7 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
                   onClick={() => setSelectedQuestionIndex(Math.max(0, selectedQuestionIndex - 1))}
                   disabled={selectedQuestionIndex === 0}
                 >
-                  <ChevronLeft size={16} /> Previous Question
+                  <ChevronLeft size={16} /> Previous
                 </button>
                 <span className="sol-count-indicator">
                   {selectedQuestionIndex + 1} of {filteredQuestions.length} in this filter
@@ -302,7 +325,7 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
                   onClick={() => setSelectedQuestionIndex(Math.min(filteredQuestions.length - 1, selectedQuestionIndex + 1))}
                   disabled={selectedQuestionIndex >= filteredQuestions.length - 1}
                 >
-                  Next Question <ChevronRight size={16} />
+                  Next <ChevronRight size={16} />
                 </button>
               </div>
             </div>
@@ -328,6 +351,8 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
                       className={`sol-palette-btn ${pillStatus} ${isCurrent ? 'active-sol' : ''}`}
                       onClick={() => setSelectedQuestionIndex(qIndex)}
                       title={`Question ${q.originalIndex} (${pillStatus})`}
+                      aria-label={`Question ${q.originalIndex}, ${pillStatus}`}
+                      aria-current={isCurrent ? 'true' : undefined}
                     >
                       {q.originalIndex}
                     </button>
@@ -341,3 +366,4 @@ export default function TestAnalysisView({ test, attempt, onBackToHub }) {
     </div>
   );
 }
+

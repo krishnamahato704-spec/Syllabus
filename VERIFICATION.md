@@ -1,54 +1,43 @@
-# Verification record
+# Assessment repair verification
 
-Checked on 28 October 2026. This record describes local checks, not a live deployed Firebase test.
+Verified 31 October 2026, India time. Working source is the assessment repair, based on remote main commit 266062946096c9b4c18ce2a9d8718b0462f34754.
 
-## Content fidelity
+## Evidence
 
-The bundled `src/data/syllabus.json` unit objects were compared directly with the revised master checklist export. All 34 units match, including topic titles, subtopic wording, IDs, source keys and scope notes. There are 204 main topics and 1,602 unique subtopics. History is one combined checklist across 11 units, including the ten NET units and school world-history additions.
+- Node 24.22.1; clean npm dependency installation succeeded and package-lock.json is included.
+- Full Node test suite: **74 passed, 0 failed, 0 skipped**.
+- Production build: exit 0. dist/ and the self-contained release/Study-Atlas.html were generated with font/dependency notices.
+- Production-browser expiry regression: a saved correct response remained correct at automatic timeout.
+- Production-browser workflow: refresh/resume retained the deadline, navigation, answers, flags and option order; manual submission saved the snapshot; completed papers remained read-only after reload; invalid JSON keys were rejected before mutation; a full backup restored a saved sitting in a fresh context.
+- Browser layout checks at 320 and 390 pixels: no page-level overflow, full question width with the navigator closed, working drawer and Escape. Desktop checks at 1440 pixels passed.
+- Component browser checks: named dialogs, focus containment and return, Escape, labelled form fields, reachable mobile footer, independent correct keys after deleting/adding questions, legacy/source labels and readable result layouts.
+- Content audit: **73 papers, 570 bank questions, 570 distinct normalized stems, 570 reachable questions**. 15 NCERT, 24 CTET, 34 NET. Every paper validates, has unique question IDs/stems and four distinct options. Correct-option positions are balanced and shuffled without a repeating A/B/C/D cycle.
+- CTET full forms: 30/30/30/60 sections, 15/15 language splits, exact two-passage compositions, 15/5/10 CDP split and 40/20 SST split. NET: all ten units, with the app's History weighting disclosed. Ancient drills contain units 1–2 only.
+- Original syllabus retained: 204 topics, 1,602 distinct subtopics.
+- Project-specific style capture succeeded: captured-study-atlas-assessment-workspace-e87641ac03fe, separate from the general Slate theme; recorded contrast checks passed.
 
-## Automated logic checks
+## Reproduce
 
-Node's test runner: **14 passed, 0 failed, 0 skipped**.
+Run npm ci, npm test and npm run build with Node 24. Serve dist using npm start. Set TEST_URL to that server and run:
 
-- Exact counts and uniqueness of the full dataset.
-- Exact-ID, concept and Hindi search with the correct parent topic.
-- Completion/revision totals ignore unknown IDs.
-- Completion timestamps survive note/revision changes, clear on uncompletion and renew on recompletion.
-- A notes dialog patches only the fields changed by its user.
-- Inclusive Asia/Kolkata date boundaries, invalid/inverted ranges and exclusion of unchecked/future items.
-- Research prompts include the selected IDs and official reference URLs.
-- Weekend prompts include only eligible completed IDs.
-- Unicode backup round trip and rejection of incompatible IDs, dates, types or oversized notes before import.
-- Account-session invalidation, stale snapshot rejection and write refusal during loading, offline, error and signed-out phases.
+    node tests/assessment-browser.cjs
+    node tests/assessment-flow-browser.cjs
+    node tests/ui-check.cjs
+    node scripts/assessment-audit.mjs
 
-## Browser checks
+Browser scripts accept PLAYWRIGHT_MODULE and CHROME_PATH for an existing local Playwright/Chromium installation. Tests use isolated browser contexts. The source scripts live in tests/; screenshots and machine audit output are generated under ignored verification/. No live user attempts were modified during testing.
 
-The production build was served through the included Node server. The downloaded single HTML was also opened directly. Both completed the browser check with no page errors.
+## Limits
 
-Checked at desktop width 1,440px and phone widths 390px and 320px:
+The Firebase web configuration remains null. Null-config behavior, record validation, UID generation guards, immutable attempt planning, stale draft protection and conflict rejection pass automated checks. **Live sign-in, real multi-device sync and Firestore rules in an emulator have not been verified**, because no project configuration/emulator was supplied. Cloud status therefore remains honest. Backups can transfer browser-local progress.
 
-- Overview, syllabus, topic, weekend review and sources/settings routes.
-- Exact searches for H004.04 and HI002.01; correctly rendered Hindi notes/text.
-- Checking a subtopic, saving notes/revision state and retaining them after reload.
-- Exact research and weekend prompt scopes; unchecked neighbouring IDs excluded.
-- Invalid date range message and disabled assessment action.
-- JSON backup download, invalid import rejection, valid import merge and preserved completion date.
-- Honest setup notice from unconfigured Google sign-in.
-- Independent empty preview in another browser context.
-- Mobile navigation and Escape, native modal operation, search keyboard shortcut, visible focus and no horizontal page overflow.
+Legacy attempts predate question snapshots. Their stored score is preserved, fake percentiles are removed, and the available historical paper is shown with an explicit warning. It cannot prove the original option order.
 
-Desktop overview, desktop topic, desktop settings, phone overview and phone topic/notes screenshots were produced and representative screens inspected. Browser checks used synthetic notes in isolated test contexts. These notes and test progress are not included in the app's initial data or source package.
+Question keys received editorial review and sampled independent checks, not external examiner certification. Difficulty is not calibrated. Topic-source links may point to broad reading; source-note files document inaccessible/time-limited references. The bank samples the syllabus and forms share questions.
 
-## Build and assets
+The build reports a large-bundle warning and harmless lucide module-directive notices. The standalone artifact includes fonts, syllabus data, legacy reconstruction and the Firebase browser SDK (about 2.8 MB before compression). No performance claim on low-bandwidth phones or assistive-technology certification is made. The no-retest lock and timer are client-side practice controls, not proctoring.
 
-The Vite production build and self-contained HTML packaging succeed. The build reports a large-script advisory because it contains the complete checklist and Firebase SDK. The standalone HTML is approximately 2.3 MB including local fonts, syllabus, code and licence notices. Font hashes were checked before copying; OFL and dependency notices are retained. The shared-library style capture succeeded with passed recorded colour-pair contrast checks (`captured-slate-study-workspace-e9cf883cd992`). That contrast result covers the recorded token pairs, not every possible UI state.
+## Publication
 
-## Owner setup and checks still required
+The tested source is intended for the existing repository and existing syllabus-1.ai.studio deployment. Publication is verified separately by checking the new build identifier, question/paper counts and live page after AI Studio Republish. Repository/hosting success must not be inferred from the local checks above.
 
-- Supply a Firebase project's public web configuration; enable Google sign-in and Firestore.
-- Publish the supplied Firestore rules. The rules were reviewed locally; no emulator-backed rules test was run because a Java runtime was not available in the working environment.
-- Authorise the exact preview/published hostnames.
-- Test real Google sign-in and sign-out, same-account sync on two devices, account switching and denied access to another account's records.
-- Publish from the owner's Google AI Studio account and check any hosting/Firebase billing choice there.
-
-No Firebase project, deployed database, external hosting site, paid service or model API connection was created during this task.

@@ -1,0 +1,18 @@
+{
+ "name":"Study Atlas assessment workspace",
+ "scope":"project",
+ "project":"study-atlas-assessment",
+ "origin":"project-reference",
+ "source_project":"https://github.com/krishnamahato704-spec/Syllabus",
+ "mode":"light",
+ "tokens":{"background":"#F4F6FA","surface":"#FFFFFF","text":"#1C293D","muted":"#536075","accent":"#2154A3","accentHover":"#163F80","onAccent":"#FFFFFF","border":"#7B879A","focus":"#2154A3","soft":"#E4EAF4"},
+ "typography":{"heading_family":"Source Serif 4","body_family":"Source Sans 3"},
+ "style_rules":{
+  "language":"Bundled Noto Sans Devanagari for Hindi, preserving OFL notices.",
+  "hub":"White header and three stream buttons; 1280px content width, 24px desktop padding. Paper cards form three columns, then two at1100px and one at700px; 9px corners, 1px slate borders and18px gaps.",
+  "exam":"Scrollable full-width question pane with local text passages and labelled radio options. Under901px the question palette overlays as a focus-contained drawer, closed by default. Actions and timer wrap on narrow screens.",
+  "results":"Phone score tiles stack; section tables scroll within their panel; question review retains readable type and original option order.",
+  "forms":"Dialogs contain focus, close with Escape and return focus. Header/footer remain reachable while a long form scrolls. Primary controls use white text on blue; status colours have text labels."
+ },
+ "tags":["assessment","education","interface","responsive","Hindi"]
+}

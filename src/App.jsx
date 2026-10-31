@@ -1,713 +1,97 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import {
-  BookOpen, Award, CheckCircle2, Clock, Search, Filter,
-  PlusCircle, Download, ArrowRight, ShieldAlert, Sparkles,
-  BarChart2, FileText, Check, AlertCircle, RefreshCw, Layers,
-  HelpCircle, ChevronRight, Bookmark, Lock, ExternalLink
-} from 'lucide-react';
-import {
-  getStoredTests, getAllAttempts, isTestCompleted, getAttemptForTest,
-  submitTestAttempt, downloadSyllabusBackupFile
-} from './test-engine.js';
-import { TEST_CATEGORIES } from './data/tests-data.js';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
+import {BookOpen,Plus,Download,Upload,Search,Clock,ArrowRight,CheckCircle2,Cloud,LogIn,LogOut,X,FileText,AlertCircle} from 'lucide-react';
+import {getStoredTests,getAllAttempts,getAllDrafts,getAssessmentState,getAssessmentScope,setAssessmentScope,saveDraft,submitTestAttempt,exportAssessmentBackup,previewAssessmentBackup,importAssessmentBackup,mergeRemoteAssessmentState,exportRecoveryBackup,downloadSyllabusBackupFile,ASSESSMENT_CHANGE_EVENT} from './test-engine.js';
+import {TEST_CATEGORIES,CATALOG_INFO,UNIT_NAMES} from './data/tests-data.js';
+import {createAssessmentCloud} from './assessment-cloud.js';
+import {firebaseConfig} from './firebase-config.js';
 import TestbookExamInterface from './components/TestbookExamInterface.jsx';
 import TestAnalysisView from './components/TestAnalysisView.jsx';
 import AddTestModal from './components/AddTestModal.jsx';
+import AccessibleModal from './components/AccessibleModal.jsx';
 
-export default function App() {
-  // Navigation / View State: 'hub' | 'exam' | 'analysis'
-  const [currentView, setCurrentView] = useState('hub');
-  const [activeTestId, setActiveTestId] = useState(null);
-  const [analysisTestId, setAnalysisTestId] = useState(null);
-
-  // Tests & Attempts State
-  const [tests, setTests] = useState(() => getStoredTests());
-  const [attempts, setAttempts] = useState(() => getAllAttempts());
-
-  // Filter & Search State - default to CTET Paper 2 (no 'all' tab per requirements)
-  const [selectedCategory, setSelectedCategory] = useState('ctet');
-  const [selectedSection, setSelectedSection] = useState('all');
-  const [quickBurstOnly, setQuickBurstOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDifficulty, setSelectedDifficulty] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'unattempted' | 'completed'
-  const [sortBy, setSortBy] = useState('default'); // 'default' | 'questions' | 'marks' | 'duration'
-
-  // Modals & Notifications
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-
-  // Refresh data on mount or storage event
-  useEffect(() => {
-    function handleStorageSync() {
-      setTests(getStoredTests());
-      setAttempts(getAllAttempts());
-    }
-    window.addEventListener('storage', handleStorageSync);
-    return () => window.removeEventListener('storage', handleStorageSync);
-  }, []);
-
-  // Sync title with active screen
-  useEffect(() => {
-    if (currentView === 'exam' && activeTestId) {
-      const activeTest = tests.find(t => t.id === activeTestId);
-      document.title = activeTest ? `${activeTest.title} · Live Exam` : 'Online Exam · Testbook';
-    } else if (currentView === 'analysis' && analysisTestId) {
-      const anTest = tests.find(t => t.id === analysisTestId);
-      document.title = anTest ? `Performance Analysis · ${anTest.title}` : 'Analysis · Testbook';
-    } else {
-      document.title = 'Testbook Assessment Hub · NCERT, CTET & UGC NET History';
-    }
-  }, [currentView, activeTestId, analysisTestId, tests]);
-
-  function showToast(msg) {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 4000);
-  }
-
-  // Reload tests and attempts from engine
-  function reloadData() {
-    setTests(getStoredTests());
-    setAttempts(getAllAttempts());
-  }
-
-  // Handle Starting a Test
-  function handleStartTest(testId) {
-    // Retest Check: Per requirement, completed tests cannot be retaken
-    if (isTestCompleted(testId)) {
-      showToast('⚠️ This test has already been completed. Retests are locked per policy. Opening your Analysis.');
-      setAnalysisTestId(testId);
-      setCurrentView('analysis');
-      window.scrollTo(0, 0);
-      return;
-    }
-
-    setActiveTestId(testId);
-    setCurrentView('exam');
-    window.scrollTo(0, 0);
-  }
-
-  // Handle Test Submission
-  function handleTestComplete(arg1, arg2, arg3, arg4) {
-    let targetTest;
-    let uAnswers;
-    let sMap;
-    let tSeconds;
-
-    if (arg1 && arg1.questions) {
-      targetTest = arg1;
-      uAnswers = arg2 || {};
-      sMap = arg3 || {};
-      tSeconds = arg4 || 0;
-    } else {
-      targetTest = tests.find(t => t.id === activeTestId);
-      uAnswers = arg1 || {};
-      sMap = arg2 || {};
-      tSeconds = arg3 || 0;
-    }
-
-    if (!targetTest) {
-      showToast('Error: Test not found for evaluation');
-      return;
-    }
-
-    try {
-      const attempt = submitTestAttempt(targetTest, uAnswers, sMap, tSeconds);
-      reloadData();
-      setActiveTestId(null);
-      setAnalysisTestId(targetTest.id);
-      setCurrentView('analysis');
-      window.scrollTo(0, 0);
-      showToast(`🎉 Test submitted successfully! Your score: ${attempt.score}/${attempt.maxScore}`);
-    } catch (e) {
-      showToast(e.message || 'Error submitting test');
-    }
-  }
-
-  // Handle viewing analysis for an attempted test
-  function handleViewAnalysis(testId) {
-    setAnalysisTestId(testId);
-    setCurrentView('analysis');
-    window.scrollTo(0, 0);
-  }
-
-  // Back to Hub
-  function handleBackToHub() {
-    setActiveTestId(null);
-    setAnalysisTestId(null);
-    setCurrentView('hub');
-    window.scrollTo(0, 0);
-  }
-
-  // Download syllabus backup file
-  async function handleDownloadSyllabusBackup() {
-    const success = await downloadSyllabusBackupFile();
-    if (success) {
-      showToast('✅ Syllabus backup file (Social_Science_Syllabus_Backup.json) downloaded!');
-    } else {
-      showToast('⚠️ Downloading backup directly from syllabus dataset...');
-      try {
-        const raw = await import('./data/backup-syllabus.json');
-        const blob = new Blob([JSON.stringify(raw.default || raw, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'Social_Science_Syllabus_Backup.json';
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
-        showToast('✅ Backup downloaded successfully!');
-      } catch (err) {
-        showToast('Could not download backup file.');
-      }
-    }
-  }
-
-  // Switch exam category and reset sub-section filter
-  function handleCategoryChange(catId) {
-    setSelectedCategory(catId);
-    setSelectedSection('all');
-    setQuickBurstOnly(false);
-  }
-
-  // Active Category Definition
-  const activeCategoryObj = useMemo(() => {
-    return TEST_CATEGORIES.find(c => c.id === selectedCategory) || null;
-  }, [selectedCategory]);
-
-  // Filtered and Sorted Tests
-  const filteredTests = useMemo(() => {
-    return tests.filter(test => {
-      // Primary category
-      if (selectedCategory === 'attempted') {
-        if (!attempts[test.id]) return false;
-      } else if (test.category !== selectedCategory) {
-        return false;
-      }
-
-      // Sectional filter within category (for CTET, UGC NET, NCERT, PG)
-      if (selectedCategory !== 'attempted' && selectedSection !== 'all') {
-        if (selectedSection === 'quick_sprint') {
-          if (!test.isQuickBurst && test.durationMinutes > 30 && test.syllabusSection !== 'quick_sprint') {
-            return false;
-          }
-        } else if (selectedSection === 'full_mock') {
-          if (test.syllabusSection !== 'full_mock' && test.syllabusSection !== 'combined_mock') {
-            return false;
-          }
-        } else if (test.syllabusSection !== selectedSection) {
-          return false;
-        }
-      }
-
-      // Quick Burst sprint filter
-      if (quickBurstOnly && !test.isQuickBurst && test.durationMinutes > 30) {
-        return false;
-      }
-
-      // Difficulty filter
-      if (selectedDifficulty !== 'all' && test.difficulty !== selectedDifficulty) {
-        return false;
-      }
-
-      // Status filter
-      const isDone = Boolean(attempts[test.id]);
-      if (statusFilter === 'completed' && !isDone) return false;
-      if (statusFilter === 'unattempted' && isDone) return false;
-
-      // Search query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesTitle = test.title.toLowerCase().includes(q);
-        const matchesTarget = (test.targetExam || '').toLowerCase().includes(q);
-        const matchesSyllabus = (test.syllabus || '').toLowerCase().includes(q);
-        const matchesSubCategory = (test.subCategory || '').toLowerCase().includes(q);
-        return matchesTitle || matchesTarget || matchesSyllabus || matchesSubCategory;
-      }
-
-      return true;
-    }).sort((a, b) => {
-      if (sortBy === 'questions') return b.totalQuestions - a.totalQuestions;
-      if (sortBy === 'marks') return b.totalMarks - a.totalMarks;
-      if (sortBy === 'duration') return a.durationMinutes - b.durationMinutes;
-      return 0;
-    });
-  }, [tests, attempts, selectedCategory, selectedSection, quickBurstOnly, selectedDifficulty, statusFilter, searchQuery, sortBy]);
-
-  // Overall Statistics
-  const stats = useMemo(() => {
-    const totalAvailable = tests.length;
-    const attemptedKeys = Object.keys(attempts);
-    const attemptedCount = attemptedKeys.length;
-    let totalScoreObtained = 0;
-    let totalMaxScore = 0;
-    let totalAccuracySum = 0;
-
-    attemptedKeys.forEach(k => {
-      const att = attempts[k];
-      if (att) {
-        totalScoreObtained += att.score || 0;
-        totalMaxScore += att.maxScore || 1;
-        totalAccuracySum += att.accuracy || 0;
-      }
-    });
-
-    const averageAccuracy = attemptedCount > 0 ? Math.round(totalAccuracySum / attemptedCount) : 0;
-    const averageScorePct = totalMaxScore > 0 ? Math.round((totalScoreObtained / totalMaxScore) * 100) : 0;
-
-    return {
-      totalAvailable,
-      attemptedCount,
-      remainingCount: Math.max(0, totalAvailable - attemptedCount),
-      averageAccuracy,
-      averageScorePct
-    };
-  }, [tests, attempts]);
-
-  // RENDER: Exam Interface
-  if (currentView === 'exam' && activeTestId) {
-    const activeTest = tests.find(t => t.id === activeTestId);
-    if (!activeTest) {
-      return (
-        <div className="testbook-not-found">
-          <h2>Test Not Found</h2>
-          <button className="tb-btn tb-btn-primary" onClick={handleBackToHub}>Back to Hub</button>
-        </div>
-      );
-    }
-    return (
-      <TestbookExamInterface
-        test={activeTest}
-        onComplete={handleTestComplete}
-        onExit={handleBackToHub}
-      />
-    );
-  }
-
-  // RENDER: Analysis Interface
-  if (currentView === 'analysis' && analysisTestId) {
-    const anTest = tests.find(t => t.id === analysisTestId);
-    const attempt = getAttemptForTest(analysisTestId);
-
-    if (!anTest || !attempt) {
-      return (
-        <div className="testbook-not-found">
-          <h2>Attempt record not found for this test</h2>
-          <button className="tb-btn tb-btn-primary" onClick={handleBackToHub}>Back to Hub</button>
-        </div>
-      );
-    }
-
-    return (
-      <TestAnalysisView
-        test={anTest}
-        attempt={attempt}
-        onBackToHub={handleBackToHub}
-      />
-    );
-  }
-
-  // RENDER: Hub View (Default)
-  return (
-    <div className="testbook-hub-container">
-      {/* Testbook Navigation Topbar */}
-      <header className="testbook-topbar">
-        <div className="topbar-left">
-          <div className="testbook-brand-badge">
-            <span className="brand-icon">
-              <Award size={22} />
-            </span>
-            <div className="brand-text">
-              <span className="brand-name">TESTBOOK<span className="brand-pro">PRO</span></span>
-              <span className="brand-sub">Assessment & Test Series Hub</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Global Hub Search Bar */}
-        <div className="topbar-search">
-          <Search size={18} className="search-icon" />
-          <input
-            type="search"
-            placeholder="Search NCERT, CTET Paper 2, or UGC NET History tests..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button className="search-clear-btn" onClick={() => setSearchQuery('')}>×</button>
-          )}
-        </div>
-
-        {/* Hub Action Buttons */}
-        <div className="topbar-actions">
-          <button
-            type="button"
-            className="tb-btn tb-btn-outline"
-            onClick={handleDownloadSyllabusBackup}
-            title="Download original Social Science syllabus backup JSON"
-          >
-            <Download size={16} /> Syllabus Backup
-          </button>
-          <button
-            type="button"
-            className="tb-btn tb-btn-primary"
-            onClick={() => setShowAddModal(true)}
-          >
-            <PlusCircle size={16} /> Add / Import Tests
-          </button>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="hub-main-content">
-        {/* Modern Header Banner with Exam Focus */}
-        <section className="hub-hero-banner">
-          <div className="hero-text-col">
-            <span className="hero-eyebrow">STANDARDIZED COMPUTER BASED TEST (CBT) SERIES</span>
-            <h1>Comprehensive Test Assessment Platform</h1>
-            <p>
-              Targeted examination preparation with official blueprint mocks and dedicated 
-              <strong> short-burst sectional tests</strong> for 
-              <strong> CTET Paper 2</strong> (CDP, English, Hindi, Social Science), 
-              <strong> UGC NET History</strong> (Paper 1 & Paper 2), and 
-              <strong> NCERT Class 6–10 Social Science</strong>.
-            </p>
-            <div className="hero-highlights-strip">
-              <span className="hero-tag">50+ Standardized Tests</span>
-              <span className="hero-tag">⚡ 15–30 Min Quick Sectionals</span>
-              <span className="hero-tag">Detailed Solutions & Diagnostics</span>
-              <span className="hero-tag">Retest Integrity Lockout</span>
-            </div>
-          </div>
-
-          {/* Assessment Velocity Card */}
-          <div className="hero-kpi-card">
-            <div className="kpi-card-header">
-              <h3>Assessment Velocity</h3>
-              <span className="kpi-status-badge">Active Profile</span>
-            </div>
-            <div className="kpi-grid">
-              <div className="kpi-item">
-                <span className="kpi-num">{stats.attemptedCount}</span>
-                <span className="kpi-label">Completed Tests</span>
-              </div>
-              <div className="kpi-item">
-                <span className="kpi-num">{stats.remainingCount}</span>
-                <span className="kpi-label">Available Tests</span>
-              </div>
-              <div className="kpi-item">
-                <span className="kpi-num">{stats.averageAccuracy}%</span>
-                <span className="kpi-label">Avg. Accuracy</span>
-              </div>
-              <div className="kpi-item">
-                <span className="kpi-num">{stats.averageScorePct}%</span>
-                <span className="kpi-label">Avg. Score</span>
-              </div>
-            </div>
-            {stats.attemptedCount > 0 && (
-              <div className="kpi-policy-notice">
-                <Lock size={13} /> Completed tests are locked for retest. Review solutions anytime.
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Primary Exam Stream Tabs */}
-        <nav className="category-nav-bar" aria-label="Exam Streams">
-          <div className="category-tabs-scroll">
-            {TEST_CATEGORIES.map(cat => {
-              const count = tests.filter(t => t.category === cat.id).length;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  className={`category-tab-btn ${selectedCategory === cat.id ? 'active' : ''}`}
-                  onClick={() => handleCategoryChange(cat.id)}
-                >
-                  <span className="cat-btn-name">{cat.name}</span>
-                  <span className="cat-btn-badge">{count}</span>
-                </button>
-              );
-            })}
-            {/* Attempted Tab */}
-            <button
-              type="button"
-              className={`category-tab-btn ${selectedCategory === 'attempted' ? 'active' : ''}`}
-              onClick={() => handleCategoryChange('attempted')}
-            >
-              <span className="cat-btn-name">My Completed Tests</span>
-              <span className="cat-btn-badge">{stats.attemptedCount}</span>
-            </button>
-          </div>
-        </nav>
-
-        {/* Dedicated Syllabus Section Navigator for the Active Category */}
-        {activeCategoryObj && selectedCategory !== 'attempted' && (
-          <div className="syllabus-section-bar">
-            <div className="syllabus-section-header">
-              <div className="section-label-group">
-                <Layers size={16} className="section-icon" />
-                <span className="section-label-title">{activeCategoryObj.shortName} Syllabus Sections:</span>
-                <span className="section-label-desc">Select a specific unit or take a quick 15–30 min practice sprint</span>
-              </div>
-              <button
-                type="button"
-                className={`quick-burst-toggle ${quickBurstOnly ? 'active' : ''}`}
-                onClick={() => setQuickBurstOnly(prev => !prev)}
-                title="Filter for 15-30 minute quick burst tests"
-              >
-                <Sparkles size={13} />
-                <span>{quickBurstOnly ? 'Showing Quick Sprints (≤30m)' : '⚡ Quick Sprints Only (≤30m)'}</span>
-              </button>
-            </div>
-
-            <div className="syllabus-chips-scroll">
-              {activeCategoryObj.sections?.map(sec => {
-                const isSecActive = selectedSection === sec.id;
-                let secCount = 0;
-                if (sec.id === 'all') {
-                  secCount = tests.filter(t => t.category === selectedCategory).length;
-                } else if (sec.id === 'quick_sprint') {
-                  secCount = tests.filter(t => t.category === selectedCategory && (t.isQuickBurst || t.durationMinutes <= 30 || t.syllabusSection === 'quick_sprint')).length;
-                } else if (sec.id === 'full_mock') {
-                  secCount = tests.filter(t => t.category === selectedCategory && (t.syllabusSection === 'full_mock' || t.syllabusSection === 'combined_mock')).length;
-                } else {
-                  secCount = tests.filter(t => t.category === selectedCategory && t.syllabusSection === sec.id).length;
-                }
-
-                return (
-                  <button
-                    key={sec.id}
-                    type="button"
-                    className={`syllabus-chip-btn ${isSecActive ? 'active' : ''} ${sec.id === 'quick_sprint' ? 'sprint-chip' : ''}`}
-                    onClick={() => {
-                      setSelectedSection(sec.id);
-                      if (sec.id === 'quick_sprint') setQuickBurstOnly(false);
-                    }}
-                  >
-                    <span>{sec.label}</span>
-                    <span className="chip-count">{secCount}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Filter and Sorting Toolbar */}
-        <div className="hub-toolbar">
-          <div className="toolbar-left">
-            <span className="results-count">
-              Showing <strong>{filteredTests.length}</strong> test papers
-              {activeCategoryObj && ` in ${activeCategoryObj.name}`}
-              {selectedSection !== 'all' && ` · ${selectedSection.replace('_', ' ').toUpperCase()}`}
-              {quickBurstOnly && ' (Quick Sprints ≤30m)'}
-              {searchQuery && ` matching "${searchQuery}"`}
-            </span>
-          </div>
-
-          <div className="toolbar-right">
-            <label className="toolbar-filter-item">
-              <span className="filter-label">Difficulty:</span>
-              <select
-                value={selectedDifficulty}
-                onChange={e => setSelectedDifficulty(e.target.value)}
-              >
-                <option value="all">All Difficulties</option>
-                <option value="Moderate">Moderate</option>
-                <option value="High">High (Advanced)</option>
-              </select>
-            </label>
-
-            <label className="toolbar-filter-item">
-              <span className="filter-label">Status:</span>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-              >
-                <option value="all">All Status</option>
-                <option value="unattempted">Unattempted Only</option>
-                <option value="completed">Completed Only</option>
-              </select>
-            </label>
-
-            <label className="toolbar-filter-item">
-              <span className="filter-label">Sort:</span>
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-              >
-                <option value="default">Default Order</option>
-                <option value="duration">Shortest Time (Quickest)</option>
-                <option value="questions">Most Questions</option>
-                <option value="marks">Highest Marks</option>
-              </select>
-            </label>
-          </div>
-        </div>
-
-        {/* Test Cards Grid */}
-        {filteredTests.length === 0 ? (
-          <div className="empty-tests-state">
-            <AlertCircle size={44} className="empty-icon" />
-            <h3>No test papers found for this selection</h3>
-            <p>Try resetting the section filter, search query, or difficulty level.</p>
-            <button
-              type="button"
-              className="tb-btn tb-btn-outline"
-              onClick={() => {
-                setSelectedSection('all');
-                setQuickBurstOnly(false);
-                setSearchQuery('');
-                setSelectedDifficulty('all');
-                setStatusFilter('all');
-              }}
-            >
-              Reset Filters
-            </button>
-          </div>
-        ) : (
-          <div className="tests-grid">
-            {filteredTests.map(test => {
-              const attempt = attempts[test.id];
-              const isDone = Boolean(attempt && attempt.completed);
-
-              return (
-                <article
-                  key={test.id}
-                  className={`test-card ${isDone ? 'is-completed' : ''} ${test.isQuickBurst || test.durationMinutes <= 30 ? 'is-quick-burst' : ''}`}
-                >
-                  {/* Card Top Row: Target Exam & Duration Badge */}
-                  <div className="card-top-row">
-                    <div className="card-exam-breadcrumb">
-                      <span className="exam-target-text">
-                        {test.targetExam || test.category.toUpperCase()}
-                      </span>
-                      {test.isSectional && (
-                        <span className="sectional-subtext">· Sectional Test</span>
-                      )}
-                    </div>
-                    {test.durationMinutes <= 30 ? (
-                      <span className="quick-sprint-badge">
-                        ⚡ {test.durationMinutes}m Sprint
-                      </span>
-                    ) : (
-                      <span className="duration-pill">
-                        <Clock size={12} /> {test.durationMinutes} Mins
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Card Title & Syllabus */}
-                  <h3 className="card-title">{test.title}</h3>
-                  <p className="card-syllabus-text">
-                    {test.syllabus || 'Standardized curriculum assessment for comprehensive performance evaluation.'}
-                  </p>
-
-                  {/* Test Specs: Clean Typographic Line (No Pill Sandwiches) */}
-                  <div className="card-meta-line">
-                    <span className="meta-point"><strong>{test.totalQuestions}</strong> Questions</span>
-                    <span className="meta-sep">·</span>
-                    <span className="meta-point"><strong>{test.totalMarks}</strong> Marks</span>
-                    <span className="meta-sep">·</span>
-                    <span className="meta-point">+{test.markingScheme?.correct || 1} / {test.markingScheme?.incorrect || 0}</span>
-                    <span className="meta-sep">·</span>
-                    <span className={`meta-diff ${test.difficulty === 'High' ? 'diff-high' : 'diff-mod'}`}>
-                      {test.difficulty}
-                    </span>
-                  </div>
-
-                  {/* Sections breakdown if full mock with multiple sections */}
-                  {test.sections && test.sections.length > 1 && (
-                    <div className="card-sections-preview">
-                      <span className="sections-preview-label">Sections:</span>
-                      <span className="sections-preview-names">
-                        {test.sections.map(s => s.name.split(' (')[0]).join(' · ')}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Card Footer: Status & Action Button */}
-                  <div className="card-action-footer">
-                    {isDone ? (
-                      <div className="completed-action-wrap">
-                        <div className="score-summary-pill">
-                          <span className="score-val">
-                            Score: <strong>{attempt.score}</strong>/{attempt.maxScore}
-                          </span>
-                          <span className="acc-val">{attempt.accuracy}% Accuracy</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="tb-btn tb-btn-success full-width"
-                          onClick={() => handleViewAnalysis(test.id)}
-                        >
-                          <BarChart2 size={16} /> View Analysis & Solutions
-                        </button>
-                        <span className="retest-lock-notice">
-                          <Lock size={12} /> Retest locked · Solutions available
-                        </span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="tb-btn tb-btn-primary full-width"
-                        onClick={() => handleStartTest(test.id)}
-                      >
-                        Start Test <ArrowRight size={15} />
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="hub-footer">
-        <div className="footer-content">
-          <div className="footer-left">
-            <strong>Testbook Assessment Hub</strong>
-            <span>Standardized Computer Based Tests for NCERT, CTET Paper 2, and UGC NET History.</span>
-          </div>
-          <div className="footer-right">
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={handleDownloadSyllabusBackup}
-            >
-              <Download size={14} /> Download Syllabus Backup
-            </button>
-            <button
-              type="button"
-              className="footer-link-btn"
-              onClick={() => setShowAddModal(true)}
-            >
-              <PlusCircle size={14} /> Import More Test Papers
-            </button>
-          </div>
-        </div>
-      </footer>
-
-      {/* Add / Import Tests Modal */}
-      {showAddModal && (
-        <AddTestModal
-          onClose={() => setShowAddModal(false)}
-          onTestAdded={() => {
-            reloadData();
-            showToast('✅ Test library updated successfully!');
-          }}
-        />
-      )}
-
-      {/* Global Toast Message */}
-      {toastMessage && (
-        <div className="hub-toast-notification" role="status">
-          <span>{toastMessage}</span>
-          <button onClick={() => setToastMessage('')}>×</button>
-        </div>
-      )}
+function download(text,name){const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),4000);}
+const initialData=()=>{try{return{tests:getStoredTests(),attempts:getAllAttempts(),drafts:getAllDrafts(),warnings:getAssessmentState().migrationWarnings||[],error:''};}catch(e){return{tests:[],attempts:{},drafts:{},warnings:[],error:e.message};}};
+const routeFromHash=()=>{const [,view,id]=location.hash.match(/^#(exam|analysis)\/(.+)$/)||[];return view?{view,id:decodeURIComponent(id)}:{view:'hub',id:null};};
+export default function App(){
+ const [data,setData]=useState(initialData),[route,setRoute]=useState(routeFromHash),[category,setCategory]=useState('ctet'),[section,setSection]=useState('all'),[unit,setUnit]=useState('all'),[query,setQuery]=useState(''),[status,setStatus]=useState('all'),[quick,setQuick]=useState(false);
+ const [modal,setModal]=useState(''),[restore,setRestore]=useState(null),[message,setMessage]=useState(''),[cloudState,setCloudState]=useState({phase:firebaseConfig?'loading':'unconfigured',user:null,error:'',pending:0});
+ const cloud=useRef(null),cloudLatest=useRef(cloudState),applyingRemote=useRef(false),syncTimer=useRef(null),fileRef=useRef(null);
+ const reload=()=>setData(initialData());
+ function navigate(view='hub',id=null){const hash=view==='hub'?'':view+'/'+encodeURIComponent(id);if(location.hash.slice(1)!==hash)history.pushState(null,'',location.pathname+location.search+(hash?'#'+hash:''));setRoute({view,id});window.scrollTo(0,0);}
+ useEffect(()=>{const fn=()=>setRoute(routeFromHash());window.addEventListener('hashchange',fn);window.addEventListener('popstate',fn);return()=>{window.removeEventListener('hashchange',fn);window.removeEventListener('popstate',fn);};},[]);
+ useEffect(()=>{
+  function scheduleSync(){clearTimeout(syncTimer.current);if(applyingRemote.current)return;syncTimer.current=setTimeout(()=>{if(['ready','saving'].includes(cloudLatest.current.phase)&&cloudLatest.current.user)try{cloud.current?.sync(getAssessmentState()).catch(e=>setMessage(e.message));}catch(e){setMessage(e.message);}},350);}
+  const changed=()=>{reload();scheduleSync();};
+  const storage=e=>{if(e.key==='study-atlas-assessment-v1:'+getAssessmentScope()){reload();}};
+  window.addEventListener(ASSESSMENT_CHANGE_EVENT,changed);window.addEventListener('storage',storage);
+  cloud.current=createAssessmentCloud(firebaseConfig,{
+   onState:next=>{
+    const nextScope=next.user?.uid||'local',changedScope=getAssessmentScope()!==nextScope;
+    if(changedScope){setAssessmentScope(nextScope);reload();navigate();}
+    cloudLatest.current=next;setCloudState(next);
+    if(next.phase==='ready')scheduleSync();
+   },
+   onRemote:state=>{
+    applyingRemote.current=true;
+    try{const result=mergeRemoteAssessmentState(state);if(result.changedDraftIds.includes(routeFromHash().id)){navigate();setMessage('A newer saved sitting arrived from another device. Resume it from the hub before continuing.');}reload();}
+    catch(e){setMessage(e.message);}
+    finally{applyingRemote.current=false;}
+   }
+  });
+  return()=>{clearTimeout(syncTimer.current);cloud.current?.destroy();window.removeEventListener(ASSESSMENT_CHANGE_EVENT,changed);window.removeEventListener('storage',storage);};
+ },[]);
+ const activeCategory=TEST_CATEGORIES.find(c=>c.id===category);
+ const papers=useMemo(()=>data.tests.filter(t=>{
+  if(query.trim()){const terms=(t.title+' '+t.questions.map(q=>q.topic+' '+q.unit).join(' ')).toLowerCase();if(!terms.includes(query.trim().toLowerCase()))return false;}
+  else if(t.category!==category)return false;
+  if(section!=='all'&&t.syllabusSection!==section)return false;
+  if(unit!=='all'&&!t.questions.some(q=>q.unit===unit))return false;
+  if(quick&&t.durationMinutes>30)return false;
+  const completed=!!data.attempts[t.id]?.completed,draft=!!data.drafts[t.id];
+  return status==='all'||status==='completed'&&completed||status==='in-progress'&&draft&&!completed||status==='available'&&!completed&&!draft;
+ }),[data,category,section,unit,query,status,quick]);
+ const availableUnits=useMemo(()=>[...new Set(data.tests.filter(t=>t.category===category&&(section==='all'||t.syllabusSection===section)).flatMap(t=>t.questions.map(q=>q.unit)).filter(Boolean))].sort((a,b)=>(UNIT_NAMES[a]||a).localeCompare(UNIT_NAMES[b]||b)),[data.tests,category,section]);
+ const activeDraft=data.drafts[route.id],activeAttempt=data.attempts[route.id],activePaper=activeDraft?.testSnapshot||activeAttempt?.testSnapshot||data.tests.find(t=>t.id===route.id);
+ function start(t){try{if(data.attempts[t.id]?.completed){navigate('analysis',t.id);return;}saveDraft(t);reload();navigate('exam',t.id);}catch(e){setMessage(e.message);}}
+ function complete(paper,answers,states,time){const result=submitTestAttempt(paper,answers,states,time);reload();navigate('analysis',paper.id);return result;}
+ async function backup(){try{download(exportAssessmentBackup(),'Study-Atlas-Progress-'+new Date().toISOString().slice(0,10)+'.json');setMessage('Progress backup downloaded. It includes your custom papers, saved answers and completed results.');}catch(e){setMessage(e.message);}}
+ async function restoreFile(e){const file=e.target.files?.[0];e.target.value='';if(!file)return;try{if(file.size>16000000)throw new Error('Choose a progress backup smaller than 16 MB.');const text=await file.text();const counts=previewAssessmentBackup(text);setRestore({text,counts,name:file.name});setModal('restore');}catch(err){setMessage(err.message);}}
+ function applyRestore(){try{importAssessmentBackup(restore.text);reload();setModal('');setRestore(null);setMessage('Backup merged. Existing completed results and saved sittings were preserved.');}catch(e){setMessage(e.message);}}
+ async function auth(action){try{await cloud.current?.[action]();}catch(e){setMessage(e.message);}}
+ const busyAccount=cloudState.pending>0||['loading','saving'].includes(cloudState.phase);
+ if(route.view==='exam'&&activeDraft&&activePaper&&!activeAttempt?.completed)return <TestbookExamInterface key={getAssessmentScope()+':'+activePaper.id} test={activePaper} onComplete={complete} onExit={()=>{reload();navigate();}}/>;
+ if((route.view==='analysis'||route.view==='exam')&&activeAttempt)return <TestAnalysisView key={activeAttempt.testId} test={activePaper} attempt={activeAttempt} onBackToHub={()=>navigate()}/>;
+ const progressDrafts=Object.values(data.drafts).filter(d=>!data.attempts[d.testId]);
+ return <div className="testbook-hub-container sa-hub">
+  <a className="skip-link" href="#paper-list">Skip to practice papers</a>
+  <header className="sa-header"><a className="sa-brand" href="#" onClick={()=>navigate()}><BookOpen size={27}/><span>Study Atlas<small>Assessment workspace</small></span></a><div className="sa-header-actions"><button onClick={backup}><Download size={17}/>Download progress</button><button onClick={()=>fileRef.current.click()}><Upload size={17}/>Restore progress</button><button className="sa-primary" onClick={()=>setModal('add')}><Plus size={18}/>Add a test</button></div></header>
+  <input ref={fileRef} type="file" accept=".json,application/json" onChange={restoreFile} className="sr-only" aria-label="Choose progress backup"/>
+  <main className="sa-main">
+   {route.view!=='hub'&&<div className="sa-notice" role="alert">That saved sitting is unavailable in this browser or account. <button onClick={()=>navigate()}>Return to papers</button></div>}
+   {data.error&&<div className="sa-notice error" role="alert"><AlertCircle size={20}/><div><strong>Saved progress needs attention</strong><p>{data.error}</p><button onClick={()=>{try{download(exportRecoveryBackup(),'Study-Atlas-Recovery.json');}catch(e){setMessage(e.message);}}}>Download recovery data</button></div></div>}
+   {message&&<div className="sa-notice" role="status"><span>{message}</span><button aria-label="Dismiss message" onClick={()=>setMessage('')}><X size={17}/></button></div>}
+   <section className="sa-intro"><div><p className="sa-eyebrow">Study. Attempt. Review.</p><h1>Choose your next practice.</h1><p>Full papers for exam pacing. Focused drills for the topics you want to revisit.</p></div><div className="sa-stat"><strong>{CATALOG_INFO.questions}</strong><span>distinct questions</span></div><div className="sa-stat"><strong>{Object.keys(data.attempts).length}</strong><span>completed sittings</span></div></section>
+   <section className="sa-sync" aria-label="Progress storage"><Cloud size={20}/><div><strong>{cloudState.user?cloudState.user.name||cloudState.user.email||'Signed in':cloudState.phase==='unconfigured'?'Saved in this browser':'Sign in to sync your assessment progress'}</strong><p>{cloudState.phase==='unconfigured'?'Cloud sign-in is not configured for this deployment. Download a backup to move progress between devices.':cloudState.phase==='signedout'?'Your local progress stays separate from an account. Use a backup to transfer it after signing in.':({loading:'Loading account records. Local account data remains available.',saving:'Saving account changes…',ready:'Account records are up to date.',offline:'Offline. Changes stay on this device until reconnection.',error:cloudState.error}[cloudState.phase]||'')}</p></div>{cloudState.phase==='unconfigured'?<button onClick={()=>setModal('sources')}>Coverage & setup</button>:cloudState.user?<><button disabled={busyAccount} onClick={()=>cloud.current?.retry()}>Retry sync</button><button disabled={busyAccount||route.view==='exam'} onClick={()=>auth('signOut')}><LogOut size={16}/>Sign out</button></>:<button disabled={busyAccount} onClick={()=>auth('signIn')}><LogIn size={16}/>Sign in with Google</button>}</section>
+   {progressDrafts.length>0&&<section className="sa-resume" aria-label="Saved sittings"><h2>Continue a saved sitting</h2><div>{progressDrafts.map(d=><button key={d.testId} onClick={()=>start(d.testSnapshot)}><span>{d.testSnapshot.title}<small>{Object.keys(d.userAnswers).length} answered · {Date.now()>=d.deadline?'Deadline passed; open to submit saved responses':'Deadline '+new Date(d.deadline).toLocaleString()}</small></span><ArrowRight size={20}/></button>)}</div><p>The original deadline keeps running when you leave or refresh.</p></section>}
+   {data.warnings.length>0&&<details className="sa-legacy"><summary>Earlier data was preserved with {data.warnings.length} warning(s)</summary>{data.warnings.map((w,i)=><p key={i}>{w}</p>)}<button onClick={()=>download(exportRecoveryBackup(),'Study-Atlas-Recovery.json')}>Download original recovery data</button></details>}
+   <nav className="sa-streams" aria-label="Exam streams">{TEST_CATEGORIES.map(c=><button key={c.id} aria-pressed={category===c.id} className={category===c.id?'active':''} onClick={()=>{setCategory(c.id);setSection('all');setUnit('all');setQuery('');}}><strong>{c.name}</strong><span>{data.tests.filter(t=>t.category===c.id&&!t.readOnly).length} practice papers</span></button>)}</nav>
+   <section id="paper-list" className="sa-paper-section" aria-label="Practice papers">
+    <div className="sa-list-heading"><div><h2>{query?'Search results across all streams':activeCategory.name}</h2><p>{query?'Search includes paper titles, topics and units.':activeCategory.description}</p></div><button className="sa-link" onClick={()=>setModal('sources')}>Coverage & official references</button></div>
+    <div className="sa-controls">
+     <label className="sa-search"><Search size={19}/><span className="sr-only">Search papers</span><input type="search" aria-label="Search papers" value={query} onChange={e=>{setQuery(e.target.value);setSection('all');setUnit('all');}} placeholder="Search papers, topics or units"/></label>
+     <label>Progress<select value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All progress</option><option value="available">Not started</option><option value="in-progress">In progress</option><option value="completed">Completed</option></select></label>
+     <label className="sa-check"><input type="checkbox" checked={quick} onChange={e=>setQuick(e.target.checked)}/>30 minutes or less</label>
     </div>
-  );
+    {!query&&<><div className="sa-subsections" aria-label="Paper sub-sections">{activeCategory.sections.map(s=><button key={s.id} aria-pressed={section===s.id} onClick={()=>{setSection(s.id);setUnit('all');}}>{s.label}</button>)}</div><label className="sa-unit-filter">Contains topic / unit<select value={unit} onChange={e=>setUnit(e.target.value)}><option value="all">All topics and units</option>{availableUnits.map(u=><option key={u} value={u}>{UNIT_NAMES[u]||u.replaceAll('-',' ')}</option>)}</select></label></>}
+    <div className="sa-result-count" role="status">{papers.length} paper{papers.length===1?'':'s'} shown <span>· Authored practice · Questions overlap across forms</span></div>
+    <div className="sa-paper-grid">{papers.map(t=>{const a=data.attempts[t.id],d=data.drafts[t.id];return <article className={'sa-paper '+(a?'completed':'')} key={t.id}><div className="sa-paper-top"><span>{TEST_CATEGORIES.find(c=>c.id===t.category)?.shortName||'Archived'}</span>{a?<span className="sa-state"><CheckCircle2 size={14}/>Completed</span>:d?<span className="sa-state">In progress</span>:<span>Practice</span>}</div><h3>{t.title}</h3><div className="sa-paper-meta"><span><FileText size={16}/>{t.totalQuestions} questions</span><span><Clock size={16}/>{t.durationMinutes} min</span><span>{t.totalMarks} marks</span></div><p className="sa-paper-description">{t.sections.map(s=>s.name).join(' · ')}</p><details className="sa-coverage"><summary>Topics & paper details</summary><p>{t.coverage?.note||'Historical paper. See the preserved result for its limitations.'}</p><p>{[...new Set(t.questions.map(q=>UNIT_NAMES[q.unit]||q.topic||q.subject).filter(Boolean))].slice(0,18).join(' · ')}</p><small>Version {t.version||'legacy'} · Correct +{t.markingScheme.correct}, wrong −{Math.abs(t.markingScheme.incorrect)}</small></details><div className="sa-paper-bottom">{a?<span>{a.score} / {a.maxScore} marks<small>{new Date(a.submittedAt).toLocaleDateString()} {a.legacy?'· Legacy result':''}</small></span>:d?<span>{Object.keys(d.userAnswers).length} answered<small>Saved on this device</small></span>:<span className="sa-muted">One recorded sitting per paper</span>}<button className="sa-primary" disabled={!!data.error||t.readOnly&&!a} onClick={()=>start(t)}>{a?'View results':d?'Resume Test':'Start Test'}<ArrowRight size={16}/></button></div></article>;})}</div>
+    {!papers.length&&<div className="sa-empty"><h3>No matching papers</h3><p>Try a broader topic, clear the filters or add your own paper.</p><button onClick={()=>{setQuery('');setStatus('all');setSection('all');setUnit('all');setQuick(false);}}>Clear filters</button></div>}
+   </section>
+   <footer className="sa-footer"><p>Study Atlas · Selected practice for NCERT, CTET and NET History. Results show marks and accuracy; no percentile or readiness prediction is calculated.</p><button onClick={()=>downloadSyllabusBackupFile()}>Download the original 1,602-item syllabus</button><small>Build {CATALOG_INFO.version}</small></footer>
+  </main>
+  {modal==='add'&&<AddTestModal onClose={()=>setModal('')} onTestAdded={reload}/>}
+  {modal==='restore'&&restore&&<AccessibleModal onClose={()=>setModal('')} labelledBy="restore-title"><div className="modal-header"><h2 id="restore-title">Restore progress backup</h2><button className="modal-close-icon" aria-label="Close restore" onClick={()=>setModal('')}><X/></button></div><div className="modal-tab-body instructions-body"><p>{restore.name}</p><p>{restore.counts.customTests} custom papers, {restore.counts.attempts} completed results, {restore.counts.drafts} saved sittings.</p><p>These records will be merged into {cloudState.user?'the signed-in account':'this browser'}. Existing completed results and saved sittings are kept. Duplicate paper IDs are skipped. Original deadlines remain in force.</p></div><div className="modal-footer-actions"><button className="btn-cancel" onClick={()=>setModal('')}>Cancel</button><button className="btn-submit-confirm" onClick={applyRestore}>Merge backup</button></div></AccessibleModal>}
+  {modal==='sources'&&<AccessibleModal onClose={()=>setModal('')} labelledBy="coverage-title" className="sa-sources-modal"><div className="modal-header"><h2 id="coverage-title">Coverage, exam structure and sources</h2><button className="modal-close-icon" aria-label="Close coverage" onClick={()=>setModal('')}><X/></button></div><div className="modal-tab-body instructions-body"><p>{CATALOG_INFO.questions} distinct questions assembled into {CATALOG_INFO.papers} practice papers and drills. Each paper avoids repeated stems. Different papers reuse questions from this finite bank. NCERT includes selected school concepts, not every chapter through Class 12.</p><p>These are authored questions with explanations and topic references, not official past papers or externally certified answer keys. Review each missed concept using its reference. A reference link identifies relevant reading; it does not mean the source contains the exact question.</p><h3>CTET Paper II · Social Science</h3><p>150 questions, 150 marks, 150 minutes. CDP 30; English I 30; Hindi II 30; Social Science 60. CDP uses 15 development, 5 inclusion and 10 learning questions. Each language uses 15 comprehension and 15 pedagogy questions. English has one prose/drama passage and one poem; Hindi has two prose passages. Social Science uses 40 content and 20 pedagogy questions. No negative marking. This website is online practice for the OMR examination.</p><h3>UGC NET History</h3><p>The combined practice paper has 50 General Paper I and 100 History questions, 300 marks, 180 minutes, without negative marking. Paper I uses five questions per unit. Equal ten-question History unit quotas are an app practice choice. Separate 60/120-minute paper timings are practice choices. All ten units have drills, but the question bank samples the syllabus.</p><p>CTET still needs school-level historical thinking and Social Science pedagogy alongside NET History content. The History content bank is shared by topic and level; pedagogy is assessed separately.</p><ul><li><a href="https://cdnbbsr.s3waas.gov.in/s3443dec3062d0286986e21dc0631734c9/uploads/2026/05/202605111250310617.pdf" target="_blank" rel="noreferrer">CBSE CTET September 2026 bulletin and Paper II syllabus</a></li><li><a href="https://www.ugcnetonline.in/syllabus-new.php" target="_blank" rel="noreferrer">UGC syllabus index · Paper I and History (06)</a></li><li><a href="https://ugcnet.nta.nic.in/information-bulletin/" target="_blank" rel="noreferrer">NTA UGC NET · updated December 2026 bulletin index</a></li><li><a href="https://ncert.nic.in/textbook.php" target="_blank" rel="noreferrer">NCERT textbooks</a></li></ul><h3>Progress and sign-in</h3><p>{firebaseConfig?'Google sign-in is configured. Keep a backup and wait for account sync before changing devices. Concurrent sittings of the same paper on two devices can produce a conflict; the first completed result is retained in the cloud.':'This build has no Firebase project configuration. Progress stays in this browser. Use Download progress and Restore progress to transfer it. To enable sign-in, the owner must configure Firebase Authentication, Firestore and the included owner-only rules; the setup guide is in the repository.'}</p><p>Completed attempts preserve the exact question and option order. Historical attempts made before snapshots were added keep their old score and display a warning. Import custom papers as new IDs when you revise content.</p></div><div className="modal-footer-actions"><button className="btn-submit-confirm" onClick={()=>setModal('')}>Return to practice</button></div></AccessibleModal>}
+ </div>;
 }
+

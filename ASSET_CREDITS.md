@@ -20,3 +20,5 @@ The copied binaries were checked against their library hashes before use:
 SIL Open Font License notices are retained in the package. Firebase, React and Vite are installed from their published npm packages and retain their upstream licences. School/exam links point to official sources; no official logos or scanned textbook pages are included.
 
 Production dependency notices are collected in `licenses/THIRD_PARTY_NOTICES.txt`. Distributed builds copy the notices into `dist/licenses`; the standalone HTML retains them in an embedded comment. The reusable style was captured successfully in the shared library as `captured-slate-study-workspace-e9cf883cd992`.
+
+The assessment repair reuses those colours and font binaries. Its project-specific card, exam drawer, result and dialog layout was captured as `captured-study-atlas-assessment-workspace-e87641ac03fe` under `study-atlas-assessment`; it is separate from the general palette. The actual capture input is `specs/assessment-repair/theme-capture.json`.

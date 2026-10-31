@@ -1,7 +1,6 @@
 {
-  "name": "Testbook Assessment Hub",
-  "description": "Standardized CBT assessment and test series platform for NCERT Class 6-10 Social Science, CTET Paper 2, UGC NET History, and PG History.",
-  "capabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "name": "Study Atlas Assessment",
+  "description": "Practice papers, topic drills, saved sittings and answer reviews for NCERT Social Science, CTET Paper II and UGC NET History.",
+  "capabilities": []
 }
+

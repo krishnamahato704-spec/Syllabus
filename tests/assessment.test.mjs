@@ -40,7 +40,7 @@ test('Default test paper bank contains at least 10 tests for each of the 3 exam 
 });
 
 test('NCERT tests strictly follow 50 questions for 50 marks format', () => {
-  const ncertMock1 = ALL_INITIAL_TESTS.find(t => t.id === 'ncert-test-01');
+  const ncertMock1 = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-ncert-mixed-1');
   assert.ok(ncertMock1, 'NCERT Mock 1 must exist');
   assert.equal(ncertMock1.totalQuestions, 50);
   assert.equal(ncertMock1.totalMarks, 50);
@@ -51,7 +51,7 @@ test('NCERT tests strictly follow 50 questions for 50 marks format', () => {
 });
 
 test('CTET Paper 2 tests follow official 150 questions format with 4 sections', () => {
-  const ctetMock1 = ALL_INITIAL_TESTS.find(t => t.id === 'ctet-full-01');
+  const ctetMock1 = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-ctet-full-1');
   assert.ok(ctetMock1, 'CTET Mock 1 must exist');
   assert.equal(ctetMock1.totalQuestions, 150);
   assert.equal(ctetMock1.totalMarks, 150);
@@ -67,10 +67,10 @@ test('CTET Paper 2 tests follow official 150 questions format with 4 sections', 
 });
 
 test('CTET sectional tests exist for CDP, English, Hindi, and Social Science', () => {
-  const cdpSec = ALL_INITIAL_TESTS.find(t => t.id === 'ctet-sec-cdp-01');
-  const engSec = ALL_INITIAL_TESTS.find(t => t.id === 'ctet-sec-eng-01');
-  const hindiSec = ALL_INITIAL_TESTS.find(t => t.id === 'ctet-sec-hindi-01');
-  const sstSec = ALL_INITIAL_TESTS.find(t => t.id === 'ctet-sec-sst-01');
+  const cdpSec = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-ctet-cdp-1');
+  const engSec = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-ctet-lang1-1');
+  const hindiSec = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-ctet-lang2-1');
+  const sstSec = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-ctet-sst-1');
 
   assert.ok(cdpSec, 'CTET CDP sectional test must exist');
   assert.ok(engSec, 'CTET English sectional test must exist');
@@ -79,13 +79,13 @@ test('CTET sectional tests exist for CDP, English, Hindi, and Social Science', (
 });
 
 test('UGC NET History tests follow official Paper 1, Paper 2, and Combined mocks (+2 marks)', () => {
-  const paper1 = ALL_INITIAL_TESTS.find(t => t.id === 'ugc-net-p1-01');
+  const paper1 = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-net-p1-1');
   assert.ok(paper1, 'UGC NET Paper 1 Mock must exist');
   assert.equal(paper1.totalQuestions, 50);
   assert.equal(paper1.totalMarks, 100);
   assert.equal(paper1.markingScheme.correct, 2);
 
-  const combined = ALL_INITIAL_TESTS.find(t => t.id === 'ugc-net-full-01');
+  const combined = ALL_INITIAL_TESTS.find(t => t.id === 'sa2-net-full-1');
   assert.ok(combined, 'UGC NET Combined Mock must exist');
   assert.equal(combined.totalQuestions, 150);
   assert.equal(combined.totalMarks, 300);
@@ -215,7 +215,7 @@ test('Custom test paper can be created and added to the bank', () => {
     title: 'My Custom Social Science Test',
     category: 'ncert',
     questions: [
-      { id: 'cust-1', question: 'Custom Question 1', options: ['A', 'B'], correctAnswer: 0 }
+      { id: 'cust-1', question: 'Custom Question 1', options: ['A', 'B', 'C', 'D'], correctAnswer: 0 }
     ]
   };
 
@@ -232,7 +232,7 @@ test('Importing test papers from JSON validates input and updates test bank', ()
       title: 'Imported Indian Geography Unit Test',
       category: 'ncert',
       questions: [
-        { id: 'imp-1', question: 'Capital of India?', options: ['Delhi', 'Mumbai'], correctAnswer: 0 }
+        { id: 'imp-1', question: 'Capital of India?', options: ['Delhi', 'Mumbai', 'Chennai', 'Kolkata'], correctAnswer: 0 }
       ]
     }
   ]);
@@ -252,3 +252,4 @@ test('Backup of original Social Science syllabus is intact and complete', () => 
   assert.equal(topics.length, 204, 'All 204 original syllabus topics must be preserved');
   assert.equal(items.length, 1602, 'All 1,602 original subtopics must be preserved');
 });
+

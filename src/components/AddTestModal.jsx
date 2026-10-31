@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import {
   X, Plus, Upload, Download, FileJson, Check, AlertCircle,
-  BookOpen, HelpCircle, Save, Trash2
+  BookOpen, Save, Trash2
 } from 'lucide-react';
 import { addTestPaper, importTestPapersFromJSON, exportTestsAsJSON, downloadSyllabusBackupFile } from '../test-engine.js';
+import AccessibleModal from './AccessibleModal.jsx';
 
 export default function AddTestModal({ onClose, onTestAdded }) {
+  const modalId = useId();
+  const questionPrefix = useRef(`custom-q-${crypto.randomUUID()}`);
+  const questionSequence = useRef(1);
   const [activeTab, setActiveTab] = useState('import'); // 'import' | 'manual' | 'backup'
   const [jsonText, setJsonText] = useState('');
   const [statusMessage, setStatusMessage] = useState({ text: '', type: '' });
@@ -20,7 +24,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
 
   const [questions, setQuestions] = useState([
     {
-      id: `custom-q-1`,
+      id: `${questionPrefix.current}-1`,
       section: 'all',
       subject: 'Social Science',
       question: '',
@@ -42,10 +46,8 @@ export default function AddTestModal({ onClose, onTestAdded }) {
         text: `Successfully imported ${result.importedCount} new test paper(s)!`,
         type: 'success'
       });
-      setTimeout(() => {
-        onTestAdded();
-        onClose();
-      }, 1200);
+      onTestAdded();
+      onClose();
     } catch (e) {
       setStatusMessage({ text: e.message || 'Error importing JSON.', type: 'error' });
     }
@@ -66,10 +68,11 @@ export default function AddTestModal({ onClose, onTestAdded }) {
   }
 
   function handleAddQuestionRow() {
+    const id = `${questionPrefix.current}-${++questionSequence.current}`;
     setQuestions(prev => [
       ...prev,
       {
-        id: `custom-q-${prev.length + 1}`,
+        id,
         section: category === 'ctet' ? 'sst' : category === 'ugc_net' ? 'p2' : 'all',
         subject: 'History',
         question: '',
@@ -122,7 +125,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
         category,
         subCategory: 'Custom User Test',
         difficulty,
-        targetExam: category === 'ncert' ? 'NCERT Class 6-10' : category === 'ctet' ? 'CTET Paper II' : category === 'ugc_net' ? 'UGC NET History' : 'PG History',
+        targetExam: category === 'ncert' ? 'NCERT Class 6-10' : category === 'ctet' ? 'CTET Paper II' : 'UGC NET History',
         totalQuestions: questions.length,
         totalMarks: questions.length * correctMarks,
         durationMinutes: Number(durationMinutes),
@@ -132,10 +135,8 @@ export default function AddTestModal({ onClose, onTestAdded }) {
       });
 
       setStatusMessage({ text: 'Test Paper saved successfully into your library!', type: 'success' });
-      setTimeout(() => {
-        onTestAdded();
-        onClose();
-      }, 1000);
+      onTestAdded();
+      onClose();
     } catch (err) {
       setStatusMessage({ text: err.message, type: 'error' });
     }
@@ -156,16 +157,11 @@ export default function AddTestModal({ onClose, onTestAdded }) {
             id: "sq-1",
             section: "all",
             subject: "History",
-            question: "Which inscription is considered the earliest epigraphic evidence for the performance of the Ashvamedha sacrifice in northern India?",
-            options: [
-              "Ayodhya Inscription of Dhanadeva",
-              "Hathigumpha Inscription of Kharavela",
-              "Besnagar Pillar Inscription of Heliodorus",
-              "Junagadh Rock Inscription of Rudradaman"
-            ],
+            question: "Which of these is a primary source for studying an ancient ruler?",
+            options: ["An inscription issued during the ruler's lifetime", "A modern school textbook", "A recent historical novel", "A modern television drama"],
             correctAnswer: 0,
             difficulty: "Moderate",
-            explanation: "The Ayodhya Stone Inscription of King Dhanadeva mentions Senapati Pushyamitra Shunga performing two Ashvamedha sacrifices."
+            explanation: "An inscription from the ruler's lifetime is evidence created during the period being studied. This is an authored practice question."
           }
         ]
       }
@@ -186,54 +182,56 @@ export default function AddTestModal({ onClose, onTestAdded }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Testbook_All_Tests_Export_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `Study_Atlas_Test_Papers_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
 
   return (
-    <div className="testbook-modal-backdrop" role="dialog" aria-modal="true">
-      <div className="testbook-modal-card large-modal">
+    <AccessibleModal onClose={onClose} labelledBy={`${modalId}-title`} describedBy={`${modalId}-description`} className="large-modal add-test-manager">
         <div className="modal-header">
           <div className="header-left-title">
             <Plus size={22} className="text-accent" />
             <div>
-              <h2>Update & Manage Test Papers</h2>
-              <p>Add new tests as you progress, import question banks, or backup syllabus</p>
+              <h2 id={`${modalId}-title`}>Manage test papers</h2>
+              <p id={`${modalId}-description`}>Import papers, write custom questions, or export your paper library.</p>
             </div>
           </div>
-          <button type="button" className="modal-close-icon" onClick={onClose}>
+          <button type="button" className="modal-close-icon" onClick={onClose} aria-label="Close paper manager">
             <X size={20} />
           </button>
         </div>
 
         {/* Modal Tabs */}
-        <div className="add-test-tabs">
+        <div className="add-test-tabs" aria-label="Paper management options">
           <button
             type="button"
             className={`tab-btn ${activeTab === 'import' ? 'active' : ''}`}
+            aria-pressed={activeTab === 'import'}
             onClick={() => setActiveTab('import')}
           >
-            <Upload size={16} /> Import Test Papers (JSON)
+            <Upload size={16} /> Import JSON
           </button>
           <button
             type="button"
             className={`tab-btn ${activeTab === 'manual' ? 'active' : ''}`}
+            aria-pressed={activeTab === 'manual'}
             onClick={() => setActiveTab('manual')}
           >
-            <Plus size={16} /> Create Custom Test Form
+            <Plus size={16} /> Create custom paper
           </button>
           <button
             type="button"
             className={`tab-btn ${activeTab === 'backup' ? 'active' : ''}`}
+            aria-pressed={activeTab === 'backup'}
             onClick={() => setActiveTab('backup')}
           >
-            <Download size={16} /> Backup & Exports
+            <Download size={16} /> Paper exports
           </button>
         </div>
 
         {statusMessage.text && (
-          <div className={`modal-status-msg ${statusMessage.type}`}>
+          <div className={`modal-status-msg ${statusMessage.type}`} role={statusMessage.type === 'error' ? 'alert' : 'status'}>
             {statusMessage.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
             <span>{statusMessage.text}</span>
           </div>
@@ -242,6 +240,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
         {/* TAB 1: IMPORT JSON */}
         {activeTab === 'import' && (
           <div className="modal-tab-body">
+            <div className="modal-form-scroll">
             <div className="import-helper-banner">
               <div>
                 <strong>Import complete test papers via JSON</strong>
@@ -269,13 +268,16 @@ export default function AddTestModal({ onClose, onTestAdded }) {
               <span className="muted" style={{ fontSize: '12px' }}>or paste raw JSON directly in the editor below:</span>
             </div>
 
+            <label className="field-label" htmlFor={`${modalId}-json`}>JSON test papers</label>
             <textarea
+              id={`${modalId}-json`}
               className="json-input-editor"
               rows={10}
               placeholder="Paste JSON test object or array of tests here..."
               value={jsonText}
               onChange={e => setJsonText(e.target.value)}
             />
+            </div>
 
             <div className="modal-footer-actions">
               <button type="button" className="btn-cancel" onClick={onClose}>
@@ -295,9 +297,10 @@ export default function AddTestModal({ onClose, onTestAdded }) {
         {/* TAB 2: MANUAL TEST CREATOR FORM */}
         {activeTab === 'manual' && (
           <form className="modal-tab-body" onSubmit={handleSaveManualTest}>
+            <div className="modal-form-scroll">
             <div className="form-grid-2">
               <label className="field-label">
-                Test Title *
+                Test title
                 <input
                   type="text"
                   required
@@ -308,8 +311,8 @@ export default function AddTestModal({ onClose, onTestAdded }) {
               </label>
 
               <label className="field-label">
-                Target Category *
-                <select value={category} onChange={e => setCategory(e.target.value)}>
+                Target category
+                <select value={category} onChange={e => { const next = e.target.value; setCategory(next); setQuestions(previous => previous.map(q => ({ ...q, section: next === 'ctet' ? 'sst' : next === 'ugc_net' ? 'p2' : 'all' }))); }}>
                   <option value="ncert">NCERT Class 6-10 Social Science</option>
                   <option value="ctet">CTET Paper 2 (Social Science)</option>
                   <option value="ugc_net">UGC NET History (Paper 1 & 2)</option>
@@ -332,6 +335,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                   type="number"
                   min={5}
                   max={300}
+                  required
                   value={durationMinutes}
                   onChange={e => setDurationMinutes(e.target.value)}
                 />
@@ -343,6 +347,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                   type="number"
                   min={1}
                   max={10}
+                  required
                   value={correctMarks}
                   onChange={e => setCorrectMarks(e.target.value)}
                 />
@@ -355,6 +360,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                   step="0.25"
                   min={0}
                   max={5}
+                  required
                   value={incorrectMarks}
                   onChange={e => setIncorrectMarks(e.target.value)}
                 />
@@ -369,7 +375,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                 className="button button-small"
                 onClick={handleAddQuestionRow}
               >
-                <Plus size={14} /> Add Another Question
+                <Plus size={14} /> Add another question
               </button>
             </div>
 
@@ -384,19 +390,31 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                         className="btn-trash"
                         onClick={() => handleRemoveQuestion(qIndex)}
                         title="Delete question"
+                        aria-label={`Delete question ${qIndex + 1}`}
                       >
                         <Trash2 size={16} />
                       </button>
                     )}
                   </div>
 
+                  <label className="field-label" htmlFor={`${q.id}-text`}>Question {qIndex + 1} text</label>
                   <textarea
+                    id={`${q.id}-text`}
+                    required
                     rows={2}
                     className="builder-q-text"
                     placeholder={`Enter Question ${qIndex + 1} text...`}
                     value={q.question}
                     onChange={e => handleUpdateQuestion(qIndex, 'question', e.target.value)}
                   />
+
+                  {category !== 'ncert' && <label className="field-label question-section-field">
+                    Question {qIndex + 1} section
+                    <select value={q.section} onChange={event => handleUpdateQuestion(qIndex, 'section', event.target.value)}>
+                      {category === 'ctet' ? <><option value="cdp">Child development and pedagogy</option><option value="lang1">English</option><option value="lang2">Hindi</option><option value="sst">Social science</option></> : <><option value="p1">Paper I</option><option value="p2">History</option></>}
+                    </select>
+                  </label>}
+                  <p className="builder-answer-hint">Select the correct answer, then enter all four options.</p>
 
                   <div className="builder-options-grid">
                     {q.options.map((opt, oIdx) => (
@@ -405,6 +423,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                           <input
                             type="radio"
                             name={`correct-${q.id}`}
+                            aria-label={`Question ${qIndex + 1}, correct answer ${String.fromCharCode(65 + oIdx)}`}
                             checked={q.correctAnswer === oIdx}
                             onChange={() => handleUpdateQuestion(qIndex, 'correctAnswer', oIdx)}
                           />
@@ -412,6 +431,8 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                         </label>
                         <input
                           type="text"
+                          aria-label={`Question ${qIndex + 1}, option ${String.fromCharCode(65 + oIdx)} text`}
+                          required
                           placeholder={`Option ${String.fromCharCode(65 + oIdx)} text`}
                           value={opt}
                           onChange={e => handleUpdateOption(qIndex, oIdx, e.target.value)}
@@ -420,15 +441,18 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                     ))}
                   </div>
 
-                  <input
-                    type="text"
+                  <label className="field-label" htmlFor={`${q.id}-explanation`}>Question {qIndex + 1} explanation (optional)</label>
+                  <textarea
+                    id={`${q.id}-explanation`}
+                    rows={2}
                     className="builder-exp-input"
-                    placeholder="Explanation / Historical justification (optional but recommended)..."
+                    placeholder="Explain why the answer is correct."
                     value={q.explanation}
                     onChange={e => handleUpdateQuestion(qIndex, 'explanation', e.target.value)}
                   />
                 </div>
               ))}
+            </div>
             </div>
 
             <div className="modal-footer-actions">
@@ -436,7 +460,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                 Cancel
               </button>
               <button type="submit" className="btn-submit-confirm">
-                <Save size={16} /> Save New Test Paper
+                <Save size={16} /> Save new test paper
               </button>
             </div>
           </form>
@@ -445,12 +469,13 @@ export default function AddTestModal({ onClose, onTestAdded }) {
         {/* TAB 3: BACKUP & EXPORTS */}
         {activeTab === 'backup' && (
           <div className="modal-tab-body">
+            <div className="modal-form-scroll">
             <div className="backup-panel-card">
               <div className="backup-card-info">
                 <BookOpen size={24} className="text-accent" />
                 <div>
                   <strong>Original Syllabus Backup</strong>
-                  <p>As requested, a complete backup copy of the 1,602 subtopic Social Science syllabus is preserved safely.</p>
+                  <p>Download the original Social Science syllabus outline. This file contains syllabus topics only.</p>
                 </div>
               </div>
               <button
@@ -466,8 +491,8 @@ export default function AddTestModal({ onClose, onTestAdded }) {
               <div className="backup-card-info">
                 <FileJson size={24} className="text-accent" />
                 <div>
-                  <strong>Export All Test Papers & Question Banks</strong>
-                  <p>Download your complete test repository including custom tests and default tests for offline study.</p>
+                  <strong>Export test papers</strong>
+                  <p>Download the current papers and questions, including your custom papers. Attempts and interrupted sittings are included in the full backup available in the hub.</p>
                 </div>
               </div>
               <button
@@ -478,6 +503,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
                 <Download size={15} /> Export Tests JSON
               </button>
             </div>
+            </div>
 
             <div className="modal-footer-actions">
               <button type="button" className="btn-cancel" onClick={onClose}>
@@ -486,7 +512,7 @@ export default function AddTestModal({ onClose, onTestAdded }) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </AccessibleModal>
   );
 }
+

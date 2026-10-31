@@ -24,6 +24,38 @@ service cloud.firestore {
       allow create, update: if owner(uid) && validItemId(itemId) && validRecord(request.resource.data);
       allow delete: if owner(uid);
     }
+    function validAssessmentRecord(recordId, data) {
+      return data.keys().hasOnly(['kind', 'paperId', 'payload', 'updatedAt'])
+        && data.keys().hasAll(['kind', 'paperId', 'payload', 'updatedAt'])
+        && data.kind in ['paper', 'draft', 'attempt']
+        && data.paperId is string
+        && data.paperId.matches('^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$')
+        && recordId == data.kind + ':' + data.paperId
+        && data.payload is string && data.payload.size() > 0
+        && data.payload.toUtf8().size() < 600000
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+    function assessmentAttemptPath(uid, paperId) {
+      let attemptId = 'attempt:' + paperId;
+      return /databases/$(database)/documents/users/$(uid)/assessmentRecords/$(attemptId);
+    }
+    match /users/{uid}/assessmentRecords/{recordId} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && validAssessmentRecord(recordId, request.resource.data)
+        && (request.resource.data.kind != 'draft'
+          || !existsAfter(assessmentAttemptPath(uid, request.resource.data.paperId)));
+      allow update: if owner(uid) && resource.data.kind in ['paper', 'draft']
+        && validAssessmentRecord(recordId, request.resource.data)
+        && request.resource.data.kind == resource.data.kind
+        && request.resource.data.paperId == resource.data.paperId
+        && (request.resource.data.kind != 'draft'
+          || !existsAfter(assessmentAttemptPath(uid, request.resource.data.paperId)));
+      // Completed results are immutable. Draft cleanup must accompany a committed result.
+      allow delete: if owner(uid) && resource.data.kind == 'draft'
+        && getAfter(assessmentAttemptPath(uid, resource.data.paperId)).data.kind == 'attempt'
+        && getAfter(assessmentAttemptPath(uid, resource.data.paperId)).data.paperId == resource.data.paperId;
+    }
     match /{document=**} { allow read, write: if false; }
   }
 }
+
